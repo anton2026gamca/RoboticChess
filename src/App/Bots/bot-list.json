@@ -1,0 +1,6 @@
+[
+    {
+        "name": "Dummy Bot",
+        "url": "./Bots/dummy-bot.js"
+    }
+]

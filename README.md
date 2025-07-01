@@ -1,0 +1,1 @@
+It's an app where you can play against chess bots, watch chess bots play against each other and even make them!

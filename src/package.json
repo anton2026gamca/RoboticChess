@@ -1,0 +1,16 @@
+{
+    "name": "roboticchess",
+    "version": "1.0.0",
+    "description": "",
+    "license": "MIT",
+    "author": "Anton Abraham",
+    "type": "commonjs",
+    "main": "start.js",
+    "scripts": {
+        "start": "electron ./start.js"
+    },
+    "dependencies": {
+        "electron": "^36.5.0"
+    },
+    "devDependencies": {}
+}
