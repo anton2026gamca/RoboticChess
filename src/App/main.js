@@ -73,30 +73,92 @@ function closeMenu() {
     document.getElementById('CloseMenuBtn').classList.add('w3-hide-small', 'w3-hide-medium');
 }
 
-function newGameBtnPressed() {
-    const overlay = document.getElementById('new-game-overlay');
-    overlay.style.display = 'flex';
-}
-
-function overlayCloseBtnPressed(id) {
+function closeOverlay(id) {
     const overlay = document.getElementById(id);
     overlay.style.display = 'none';
 }
 
+class Bot {
+    constructor(name, url = '', code = '') {
+        this.name = name;
+        this.url = url;
+        this.code = code;
+        if (url == '') {
+            this.isCustom = true;
+        } else {
+            this.isCustom = false;
+            fetch(url)
+                .then(response => response.text())
+                .then(code => {
+                    this.code = code;
+                })
+                .catch(err => {
+                    console.error(`Failed to load bot code from ${url}:`, err);
+                });
+        }
+    }
+}
+
+let bots = [];
+
 let white_bot;
 let white_bot_move;
+let white_bot_iframe;
 
 let black_bot;
 let black_bot_move;
+let black_bot_iframe;
 
-async function overlayStartGameBtnPressed() {
+async function setUpBot(bot, isWhite) {
+    const moduleCode = `
+        ${bot.code}
+        window.addEventListener("message", async event => {
+            const { type, value } = event.data;
+            if (type == "think") {
+                const result = await think(value);
+                parent.postMessage({type: 'move', value: result}, "*");
+            }
+        });
+    `;
+    const iframe = document.getElementById(isWhite ? 'white-bot-iframe' : 'black-bot-iframe');
+    iframe.srcdoc = `<!DOCTYPE html><html><body><script type="module">${moduleCode}<\/script></body></html>`;
+    window.addEventListener('message', function handler(event) {
+        const { type, value } = event.data;
+        if (type == 'move') {
+            if (isWhite) white_bot_move = value;
+            else black_bot_move = value;
+        }
+    });
+
+    let ready = false;
+
+    if (isWhite) {
+        white_bot = bot;
+        window.white_bot = white_bot;
+        white_bot_iframe = iframe;
+        iframe.onload = () => {
+            ready = true;
+        };
+    } else {
+        black_bot = bot;
+        window.black_bot = black_bot;
+        black_bot_iframe = iframe;
+        iframe.onload = () => {
+            ready = true;
+        };
+    }
+
+    while (!ready) await new Promise(resolve => setTimeout(resolve, 10));
+}
+
+async function startGameBtnPressed() {
     if (playingGame)
         quitRequested = true;
 
     let white_bot_ready = false;
     let black_bot_ready = false;
     
-    overlayCloseBtnPressed('new-game-overlay');
+    closeOverlay('new-game-overlay');
     
     const whitePlayerType = document.getElementById('white-player-type').value;
     const blackPlayerType = document.getElementById('black-player-type').value;
@@ -105,78 +167,57 @@ async function overlayStartGameBtnPressed() {
     if (whitePlayerType == 'bot') {
         const type = document.getElementById('white-bot-type');
         const input = document.getElementById('white-bot-script');
-        if (type.value == 'custom' && (!input.files || input.files.length <= 0))
-        {
-            console.error("[White Bot] Error: No bot file selected");
-            return;
-        }
-        const file = type.value == 'custom' ? input.files[0] : await (await fetch(type.value)).blob();
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const moduleCode = `
-                ${e.target.result}
-                window.addEventListener("message", async event => {
-                    const { type, value } = event.data;
-                    document.body.innerHTML += "a";
-                    if (type == "think") {
-                        const result = await think(value);
-                        parent.postMessage({type: 'move', value: result}, "*");
-                    }
-                });
-            `;
-            const iframe = document.getElementById('white-bot-iframe');
-            iframe.srcdoc = `<!DOCTYPE html><html><body><script type="module">${moduleCode}<\/script></body></html>`;
-            window.addEventListener('message', function handler(event) {
-                const { type, value } = event.data;
-                if (type == 'move')
-                    white_bot_move = value;
-            });
-            
-            white_bot = iframe.contentWindow;
-            iframe.onload = () => {
-                white_bot_ready = true;
+        const isCustom = type.value === '*';
+
+        if (isCustom) {
+            if ((!input.files || input.files.length <= 0))
+            throw new Error("[White Bot] Error: No bot file selected");
+            const file = input.files[0];
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const bot = addBot(input.files[0].name, '', e.target.result);
+                await setUpBot(bot, true);
+            };
+            reader.readAsText(file);
+        } else {
+            const bot = bots.find(b => b.name === type.value);
+            if (!bot) {
+                console.error(`[White Bot] Error: Bot "${type.value}" not found`);
+                return;
             }
-        };
-        reader.readAsText(file);
+            await setUpBot(bot, true);
+        }
+        white_bot_ready = true;
     } else {
         white_bot_ready = true;
     }
     if (blackPlayerType == 'bot') {
         const type = document.getElementById('black-bot-type');
         const input = document.getElementById('black-bot-script');
-        if (type.value == 'custom' && (!input.files || input.files.length <= 0))
-        {
-            console.error("[Black Bot] Error: No bot file selected");
-            return;
-        }
-        const file = type.value == 'custom' ? input.files[0] : await (await fetch(type.value)).blob();
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const moduleCode = `
-                ${e.target.result}
-                window.addEventListener("message", async event => {
-                    const { type, value } = event.data;
-                    document.body.innerHTML += "a";
-                    if (type == "think") {
-                        const result = await think(value);
-                        parent.postMessage({type: 'move', value: result}, "*");
-                    }
-                });
-            `;
-            const iframe = document.getElementById('black-bot-iframe');
-            iframe.srcdoc = `<!DOCTYPE html><html><body><script type="module">${moduleCode}<\/script></body></html>`;
-            window.addEventListener('message', function handler(event) {
-                const { type, value } = event.data;
-                if (type == 'move')
-                    black_bot_move = value;
-            });
-            
-            black_bot = iframe.contentWindow;
-            iframe.onload = () => {
-                black_bot_ready = true;
+        const isNew = type.value === '*';
+
+        if (isNew) {
+            if ((!input.files || input.files.length <= 0))
+                throw new Error("[Black Bot] Error: No bot file selected");
+            const file = input.files[0];
+            const reader = new FileReader();
+            let done = false;
+            reader.onload = async function(e) {
+                const bot = addBot(input.files[0].name, '', e.target.result);
+                await setUpBot(bot, false);
+                done = true;
+            };
+            reader.readAsText(file);
+            while (!done) await new Promise(resolve => setTimeout(resolve, 10));
+        } else {
+            const bot = bots.find(b => b.name === type.value);
+            if (!bot) {
+                console.error(`[Black Bot] Error: Bot "${type.value}" not found`);
+                return;
             }
-        };
-        reader.readAsText(file);
+            await setUpBot(bot, false);
+        }
+        black_bot_ready = true;
     } else {
         black_bot_ready = true;
     }
@@ -189,19 +230,7 @@ async function overlayStartGameBtnPressed() {
     createBoard(whiteOnBottom);
     syncBoard();
 
-    function waitForBots() {
-        return new Promise(resolve => {
-            function checkReady() {
-                if ((!playingGame) && white_bot_ready && black_bot_ready) {
-                    resolve();
-                } else {
-                    setTimeout(checkReady, 50);
-                }
-            }
-            checkReady();
-        });
-    }
-    await waitForBots();
+    while (playingGame || !white_bot_ready || !black_bot_ready) await new Promise(resolve => setTimeout(resolve, 25));
     playGame(whitePlayerType === 'human', blackPlayerType === 'human');
 }
 
@@ -221,12 +250,90 @@ function undoMoveBtnPressed() {
     updateTimersDisplay();
 }
 
+function addBot(name, url = '', code = '') {
+    let customBots = [];
+    const botsStr = localStorage.getItem('custom-bots');
+    if (botsStr)
+        customBots = JSON.parse(botsStr);
+    customBots = customBots.filter(b => b.name !== name);
+    bots = bots.filter(b => !(b.name === name && b.isCustom));
+    customBots.push({ name, code });
+    localStorage.setItem('custom-bots', JSON.stringify(customBots));
+    
+    const bot = new Bot(name, url, code);
+    bots.push(bot);
+    
+    refreshBotsList();
+
+    return bot;
+}
+
+function openCodeEditor(botName, botCode) {
+    document.getElementById('code-editor-overlay').style.display = 'flex';
+    const code = document.getElementById('code-editor');
+    code.textContent = botCode;
+    Prism.highlightElement(code);
+    document.getElementById('code-editor-title').value = botName;
+}
+
+async function saveCode() {
+    document.getElementById('code-editor-overlay').style.display = 'none';
+    const code = document.getElementById('code-editor').textContent;
+    const title = document.getElementById('code-editor-title').value.trim();
+
+    const bot = addBot(title, '', code);
+
+    if (white_bot?.name && title == white_bot.name) {
+        window.white_bot_code = code;
+        setUpBot(bot, true);
+    } else if (black_bot?.name && title == black_bot.name) {
+        window.black_bot_code = code;
+        setUpBot(bot, false);
+    }
+}
+
+function editBot(botName) {
+    const bot = bots.find(b => b.name === botName);
+    if (!bot) return;
+    openCodeEditor(bot.name, bot.code);
+}
+
+function deleteBot(botName) {
+    const botIndex = bots.findIndex(b => b.name === botName && b.isCustom);
+    if (botIndex === -1) return;
+
+    bots.splice(botIndex, 1);
+
+    let customBots = [];
+    const botsStr = localStorage.getItem('custom-bots');
+    if (botsStr) {
+        customBots = JSON.parse(botsStr);
+        customBots = customBots.filter(b => b.name !== botName);
+        localStorage.setItem('custom-bots', JSON.stringify(customBots));
+    }
+
+    refreshBotsList();
+}
+
 window.openMenu = openMenu;
 window.closeMenu = closeMenu;
-window.newGameBtnPressed = newGameBtnPressed;
-window.overlayCloseBtnPressed = overlayCloseBtnPressed;
-window.overlayStartGameBtnPressed = overlayStartGameBtnPressed;
+window.closeOverlay = closeOverlay;
+window.startGameBtnPressed = startGameBtnPressed;
 window.undoMoveBtnPressed = undoMoveBtnPressed;
+window.openCodeEditor = openCodeEditor;
+window.saveCode = saveCode;
+window.editBot = editBot;
+window.deleteBot = deleteBot;
+
+const newBotCode = `import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
+
+export function think(fen) {
+    const board = new Chess.Board(fen);
+    const moves = board.GetMoves();
+    const move = moves[Math.floor(Math.random() * moves.length)];
+    return move;
+}`;
+window.newBotCode = newBotCode;
 
 
 let board = new Chess.Board();
@@ -278,19 +385,20 @@ async function playGame(whiteIsHuman, blackIsHuman) {
     updateTimersDisplay();
 
     const topName = document.getElementById('player-top-name');
-    topName.innerHTML = whiteOnBottom ? 'Black' : 'White';
+    topName.innerHTML = !whiteOnBottom ? (whiteIsHuman ? 'White' : `${white_bot.name} [White]`) : (blackIsHuman ? 'Black' : `${black_bot.name} [Black]`);
     const bottomName = document.getElementById('player-bottom-name');
-    bottomName.innerHTML = whiteOnBottom ? 'White' : 'Black';
+    bottomName.innerHTML = whiteOnBottom ? (whiteIsHuman ? 'White' : `${white_bot.name} [White]`) : (blackIsHuman ? 'Black' : `${black_bot.name} [Black]`);
 
+    const botIndicator = `<div id="bot-indicator" class="w3-right w3-padding-small w3-round-large w3-light-green" style="text-align: center; margin-left: 5px; user-select: none">BOT</div>`;
     if (!whiteIsHuman) {
         const id = whiteOnBottom ? 'player-bottom-display' : 'player-top-display';
         const display = document.getElementById(id);
-        display.innerHTML += `<span id="bot-indicator" class="w3-right w3-padding-small w3-round-large w3-light-green" style="text-align: center; margin-left: 5px;">BOT</span>`;
+        display.innerHTML += botIndicator;
     }
     if (!blackIsHuman) {
         const id = whiteOnBottom ? 'player-top-display' : 'player-bottom-display';
         const display = document.getElementById(id);
-        display.innerHTML += `<span id="bot-indicator" class="w3-right w3-padding-small w3-round-large w3-light-green" style="text-align: center; margin-left: 5px;">BOT</span>`;
+        display.innerHTML += botIndicator;
     }
 
     async function gameLoop() {
@@ -369,7 +477,7 @@ async function playGame(whiteIsHuman, blackIsHuman) {
     if (blackTimerInterval) { clearInterval(blackTimerInterval); blackTimerInterval = null; }
     updateTimersDisplay();
 
-    console.log(`Game finished \nWinner: %c${state.winner}%c\nReason: %c${state.reason}`, 'color: aqua;', '', 'color: aqua');
+    console.log(`Game finished\nWinner: %c${state.winner}%c\nReason: %c${state.reason}`, 'color: aqua;', '', 'color: aqua');
     if (state.reason != 'game interrupted') {
         const overlay = document.getElementById('game-finished-overlay');
         overlay.style.display = 'flex';
@@ -573,41 +681,34 @@ function getUserInput() {
 function getBotInput() {
     return new Promise(resolve => {
         let finished = false;
-        let bot = board.whiteToPlay ? white_bot : black_bot;
+        let bot = board.whiteToPlay ? white_bot_iframe : black_bot_iframe;
 
         if (!bot) {
-            // fallback to random move if bot is not defined
             let moves = board.GetMoves();
             resolve(moves.length ? moves[Math.floor(Math.random() * moves.length)] : null);
-            return;
         }
 
-        const checkMove = () => {
+        bot.contentWindow.postMessage({ type: 'think', value: board.CreateFEN() }, "*");
+
+        const moveCheck = setInterval(() => {
             let moveObj = board.whiteToPlay ? white_bot_move : black_bot_move;
             if (moveObj) {
                 finished = true;
-                // Reset the move variable
                 if (board.whiteToPlay) white_bot_move = null;
                 else black_bot_move = null;
                 clearInterval(moveCheck);
                 clearInterval(undoCheck);
                 resolve(moveObj ? new Chess.Move(moveObj.from.toUpperCase(), moveObj.to.toUpperCase()) : null);
             }
-        };
-
-        bot.postMessage({ type: 'think', value: board.CreateFEN() }, "*");
-
-        const moveCheck = setInterval(checkMove, 50);
-
+        }, 50);
         const undoCheck = setInterval(() => {
             if ((undoRequested || quitRequested) && !finished) {
-            finished = true;
-            clearInterval(moveCheck);
-            clearInterval(undoCheck);
-            // Reset the move variable
-            if (board.whiteToPlay) white_bot_move = null;
-            else black_bot_move = null;
-            resolve(null);
+                finished = true;
+                clearInterval(moveCheck);
+                clearInterval(undoCheck);
+                if (board.whiteToPlay) white_bot_move = null;
+                else black_bot_move = null;
+                resolve(null);
             }
         }, 100);
     });
@@ -652,48 +753,61 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('black-bot-script').style.display = blackType === 'bot' ? 'block' : 'none';
 });
 
-
-const whiteBotTypeSelect = document.getElementById('white-bot-type');
-const blackBotTypeSelect = document.getElementById('black-bot-type');
-
-try {
+async function loadBots() {
     const response = await fetch('./Bots/bot-list.json');
     if (!response.ok) {
         throw new Error(`Failed to load bot list: ${response.statusText}`);
     }
-    const botList = await response.json();
-    
-    if (whiteBotTypeSelect && Array.isArray(botList)) {
-        botList.forEach(bot => {
-            const option = document.createElement('option');
-            option.value = bot.url || '';
-            option.textContent = bot.name || 'Unnamed Bot';
-            whiteBotTypeSelect.appendChild(option);
-        });
+    const defaultBots = await response.json();
+    const customBotsStr = localStorage.getItem('custom-bots');
+    let customBots = [];
+    if (customBotsStr) {
+        customBots = JSON.parse(customBotsStr);
     }
-    if (blackBotTypeSelect && Array.isArray(botList)) {
-        botList.forEach(bot => {
-            const option = document.createElement('option');
-            option.value = bot.url || '';
-            option.textContent = bot.name || 'Unnamed Bot';
-            blackBotTypeSelect.appendChild(option);
-        });
+
+    defaultBots.forEach(bot => {
+        bots.push(new Bot(bot.name, bot.url));
+    });
+    customBots.forEach(bot => {
+        bots.push(new Bot(bot.name, '', bot.code));
+    });
+}
+
+async function refreshBotsList() {
+    const botListContainer = document.getElementById('bot-list-container');
+    const whiteBotTypeSelect = document.getElementById('white-bot-type');
+    const blackBotTypeSelect = document.getElementById('black-bot-type');
+    botListContainer.innerHTML = "";
+    whiteBotTypeSelect.innerHTML = "";
+    blackBotTypeSelect.innerHTML = "";
+
+    bots.forEach(bot => {
+        whiteBotTypeSelect.innerHTML += `<option value="${bot.name}">${bot.isCustom ? '* ' : ''}${bot.name}</option>`;
+        blackBotTypeSelect.innerHTML += `<option value="${bot.name}">${bot.isCustom ? '* ' : ''}${bot.name}</option>`;
+        if (bot.isCustom) {
+            botListContainer.innerHTML += `
+                <div class="w3-padding-small w3-round-large bot-list-item">
+                    <span id="bot-name" style="flex: 1; min-width: 0; overflow: show; white-space: nowrap;">* ${bot.name}</span>
+                    <button class="w3-button w3-round w3-light-green w3-center bot-list-btn" onclick="editBot('${bot.name}')"><i class="fa fa-pencil"></i></button>
+                    <button class="w3-button w3-round w3-red bot-list-btn" onclick="deleteBot('${bot.name}')"><i class="fa fa-trash"></i></button>
+                </div>`;
+        }
+    });
+
+    whiteBotTypeSelect.innerHTML += '<option value="*">Custom</option>';
+    blackBotTypeSelect.innerHTML += '<option value="*">Custom</option>';
+
+    const whiteBotType = localStorage.getItem('white-bot-type');
+    const blackBotType = localStorage.getItem('black-bot-type');
+    if (whiteBotType) {
+        whiteBotTypeSelect.value = whiteBotType;
+        whiteBotTypeSelect.dispatchEvent(new Event('change'));
     }
-} catch (err) {
-    console.error(err);
+    if (blackBotType) {
+        blackBotTypeSelect.value = blackBotType;
+        blackBotTypeSelect.dispatchEvent(new Event('change'));
+    }
 }
 
-
-whiteBotTypeSelect.innerHTML += '<option value="custom">Custom</option>';
-const whiteBotType = localStorage.getItem('white-bot-type');
-if (whiteBotType && whiteBotTypeSelect) {
-    whiteBotTypeSelect.value = whiteBotType;
-    whiteBotTypeSelect.dispatchEvent(new Event('change'));
-}
-
-blackBotTypeSelect.innerHTML += '<option value="custom">Custom</option>';
-const blackBotType = localStorage.getItem('black-bot-type');
-if (blackBotType && blackBotTypeSelect) {
-    blackBotTypeSelect.value = blackBotType;
-    blackBotTypeSelect.dispatchEvent(new Event('change'));
-}
+await loadBots();
+refreshBotsList();
