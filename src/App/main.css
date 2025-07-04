@@ -1,87 +1,168 @@
-/*
-div {
-    border: 1px solid red;
+/* ============================================================================
+   ROBOTIC CHESS - MAIN STYLESHEET
+   ============================================================================ */
+
+/* ============================================================================
+   CSS CUSTOM PROPERTIES (VARIABLES)
+   ============================================================================ */
+
+:root {
+    /* Color Palette */
+    --color-bg-primary: #222;
+    --color-bg-secondary: #333;
+    --color-bg-tertiary: #444;
+    --color-text-primary: whitesmoke;
+    --color-text-secondary: #fff;
+    --color-text-dark: #222;
+    --color-text-black: #000;
+    
+    /* Chess Board Colors */
+    --color-square-light: #f0d9b5;
+    --color-square-dark: #b58863;
+    --color-square-selected-light: #d32f2f;
+    --color-square-selected-dark: #b71c1c;
+    
+    /* Timer Colors */
+    --color-timer-bg: #444;
+    --color-timer-active-bg: whitesmoke;
+    --color-timer-active-text: black;
+    
+    /* Interactive Colors */
+    --color-focus-outline: #007acc;
+    --color-button-selected-bg: #f1f1f1;
+    --color-button-selected-text: #000;
+    
+    /* Overlay Colors */
+    --color-overlay-bg: rgba(30, 30, 30, 0.5);
+    --color-shadow: rgba(0, 0, 0, 0.4);
+    
+    /* Spacing */
+    --spacing-xs: 2px;
+    --spacing-sm: 4px;
+    --spacing-md: 8px;
+    --spacing-lg: 16px;
+    --spacing-xl: 20px;
+    --spacing-xxl: 24px;
+    
+    /* Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 7px;
+    --radius-lg: 16px;
+    
+    /* Font Sizes */
+    --font-size-sm: 12px;
+    --font-size-md: 14px;
+    --font-size-lg: 15px;
+    
+    /* Layout Dimensions */
+    --board-label-size: 16px;
+    --timer-min-width: 75px;
+    --timer-height: 31px;
+    --overlay-min-width: 400px;
+    --chess-container-min-width: 300px;
+    --menu-min-width: 200px;
+    --code-editor-btn-min-width: 110px;
 }
-*/
-body {
-    background: #222;
-    color: whitesmoke;
+
+/* ============================================================================
+   BASE LAYOUT & TYPOGRAPHY
+   ============================================================================ */
+
+.app-body {
+    background: var(--color-bg-primary);
+    color: var(--color-text-primary);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
 
-.sidemenu {
-    background-color: #333;
-    color: whitesmoke;
-}
+/* ============================================================================
+   LAYOUT CONTAINERS
+   ============================================================================ */
 
-.content-container {
+.main-content-container {
     flex: 1 1 auto;
     display: flex;
     flex-wrap: wrap;
 }
 
-.chess-container {
+.chess-game-container {
     display: flex;
     justify-content: center;
     align-items: center;
-    flex:1 1 400px;
-    min-width:300px;
+    flex: 1 1 400px;
+    min-width: var(--chess-container-min-width);
+    align-self: flex-start;
 }
 
-.chess-board-container {
-    margin: 20px 40px 20px 40px;
+/* Navigation and sidebar menus */
+.app-sidemenu {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+}
+
+.menu-section {
+    background-color: var(--color-bg-tertiary);
+}
+
+/* ============================================================================
+   CHESS BOARD COMPONENTS
+   ============================================================================ */
+
+.chess-board-wrapper {
+    margin: var(--spacing-xl) 40px;
     width: 100%;
     max-width: 70vh;
 }
 
-.chess-board {
+.chess-game-board {
     aspect-ratio: 1 / 1;
-    margin-top: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 0 20px #0008;
+    margin: var(--spacing-lg) 0;
+    box-shadow: 0 0 var(--spacing-xl) #0008;
 }
 
-.board-row {
+/* Board structure */
+.board-game-row {
     display: flex;
     flex-direction: row;
     align-items: center;
     height: calc(calc(100% - 32px) / 8);
 }
 
-.board-row.board-label-row {
-    height: 16px;
+.board-label-row {
+    height: var(--board-label-size);
 }
 
-.board-label {
+/* Board labels and coordinates */
+.board-coordinate-label {
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #222;
+    color: var(--color-text-dark);
     font-weight: bold;
-    font-size: 12px;
+    font-size: var(--font-size-sm);
     user-select: none;
 }
 
-.board-label.board-label-vertical {
-    width: 16px;
+.board-vertical-label {
+    width: var(--board-label-size);
     height: 100%;
 }
 
-.board-label.board-label-horizontal {
-    width: calc(calc(100% - 16px * 2) / 8);
+.board-horizontal-label {
+    width: calc(calc(100% - var(--board-label-size) * 2) / 8);
     height: 100%;
 }
 
-.board-corner {
-    width: 16px;
+.board-corner-element {
+    width: var(--board-label-size);
     height: 100%;
-    border-top-left-radius: 16px;
+    border-top-left-radius: var(--board-label-size);
 }
 
-.board-square {
-    width: calc(calc(100% - 16px * 2) / 8);
+/* Chess squares */
+.chess-game-square {
+    width: calc(calc(100% - var(--board-label-size) * 2) / 8);
     height: 100%;
     display: flex;
     justify-content: center;
@@ -89,23 +170,26 @@ body {
     user-select: none;
 }
 
-.light {
-    background: #f0d9b5;
+/* Square colors */
+.square-light {
+    background: var(--color-square-light);
 }
 
-.dark {
-    background: #b58863;
+.square-dark {
+    background: var(--color-square-dark);
 }
 
-.light.board-square-selected {
-    background: #d32f2f;
+/* Selected square highlighting */
+.square-light.square-selected {
+    background: var(--color-square-selected-light);
 }
 
-.dark.board-square-selected {
-    background: #b71c1c;
+.square-dark.square-selected {
+    background: var(--color-square-selected-dark);
 }
 
-.chess-piece {
+/* Chess pieces */
+.chess-game-piece {
     width: 100%;
     height: 100%;
     user-select: none;
@@ -113,94 +197,51 @@ body {
     pointer-events: none;
 }
 
-.chess-piece.dragging {
+.piece-dragging {
     position: absolute;
 }
 
-.player-text-container {
-    padding-left: 10px;
-    padding-right: 10px;
-    min-height: 31px;
-    height: 31px;
+/* ============================================================================
+   PLAYER INTERFACE
+   ============================================================================ */
+
+.player-info-container {
+    padding: 0 10px;
+    min-height: var(--timer-height);
+    height: var(--timer-height);
 }
 
-.clock {
-    background-color: #444;
-    color: whitesmoke;
-}
-
-.clock-active {
-    background-color: whitesmoke;
-    color: black;
-}
-
-.menu {
-    background-color: #444;
-}
-
-@media (min-width: 993px) {
-    .expand-large {
-        height: 100%;
-    }
-}
-
-@media (min-width: 601px) {
-    .expand-medium {
-        height: 100%;
-    }
-}
-
-.overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
+.player-display-name {
     height: 100%;
-    background: rgba(30,30,30,0.5);
-    z-index: 1000;
     display: flex;
     align-items: center;
-    justify-content: center;
 }
 
-.overlay-content {
-    background: #222;
-    padding: 20px 20px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
-    min-width: 400px;
-    border-radius: 7px;
+/* Timer displays */
+.game-timer,
+.timer-display {
+    background-color: var(--color-timer-bg);
+    color: var(--color-text-primary);
+    min-width: var(--timer-min-width);
+    min-height: var(--timer-height);
+    text-align: center;
+    margin-left: 5px;
 }
 
-.overlay-content.fullscreen {
-    width: 100vw;
-    height: 100vh;
+.timer-active {
+    background-color: var(--color-timer-active-bg);
+    color: var(--color-timer-active-text);
 }
 
-.code-editor {
-    flex: 1 1 auto;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    background: transparent;
-    color: #fff;
-    border: 2px solid #fff;
-    border-radius: 6px;
-    overflow: auto;
-}
+/* ============================================================================
+   MENU & NAVIGATION
+   ============================================================================ */
 
-.code-editor code {
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-height: 100%;
-    max-height: 100vh;
-    outline: none;
-    font-family: 'Fira Mono', 'Consolas', monospace;
-    font-size: 15px;
-    background: transparent;
-    color: inherit;
-    white-space: pre;
-    overflow: auto;
+.bot-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-md);
 }
 
 .bot-list-item {
@@ -225,4 +266,376 @@ body {
 
 .bot-list-item:hover .bot-list-btn {
     display: inline-block !important;
+    outline: 4px solid #333;
+}
+
+.bot-list-item .bot-list-name {
+    flex: 1;
+    min-width: 0;
+    overflow: show;
+    white-space: nowrap;
+}
+
+/* Bot list items */
+.custom-bot-item {
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-secondary);
+    user-select: none;
+    position: relative;
+    min-height: var(--timer-height);
+    margin-top: var(--spacing-xs);
+}
+
+.bot-action-button {
+    margin-left: var(--spacing-sm);
+    padding: 0;
+    font-size: var(--font-size-md);
+    min-width: 28px;
+    display: none;
+}
+
+.custom-bot-item:hover .bot-action-button {
+    display: inline-block !important;
+}
+
+/* ============================================================================
+   OVERLAY SYSTEM
+   ============================================================================ */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--color-overlay-bg);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    isolation: isolate;
+}
+
+/* Make content behind overlay non-interactive */
+.modal-overlay-active {
+    overflow: hidden;
+}
+
+.modal-overlay-active > *:not(.modal-overlay) {
+    pointer-events: none;
+    filter: blur(1px);
+    transition: filter 0.2s ease;
+}
+
+.modal-overlay-active > *:not(.modal-overlay) * {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    pointer-events: none;
+}
+
+.modal-content-wrapper {
+    background: var(--color-bg-primary);
+    padding: var(--spacing-xl);
+    box-shadow: 0 4px var(--spacing-xxl) var(--color-shadow);
+    min-width: var(--overlay-min-width);
+    border-radius: var(--radius-md);
+    position: relative;
+}
+
+.fullscreen-modal {
+    width: 100vw;
+    height: 100vh;
+}
+
+.modal-close-button {
+    font-size: var(--font-size-md);
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    width: var(--spacing-xxl);
+    height: var(--spacing-xxl);
+    padding: 0;
+    aspect-ratio: 1 / 1;
+}
+
+/* ============================================================================
+   FORM COMPONENTS
+   ============================================================================ */
+
+.game-configuration-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.player-config-section {
+    color: var(--color-text-secondary);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.config-section-label {
+    font-weight: bold;
+    margin-bottom: var(--spacing-sm);
+}
+
+.button-selection-group {
+    display: flex;
+    align-items: center;
+}
+
+.selection-toggle-button {
+    flex: 1;
+}
+
+.hidden-form-select {
+    flex: 1;
+    display: none !important;
+}
+
+.bot-configuration-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.bot-selection-dropdown {
+    height: 30px;
+}
+
+.bot-file-input {
+    display: none;
+}
+
+.form-submit-button {
+    margin-top: 18px;
+}
+
+/* ============================================================================
+   CODE EDITOR
+   ============================================================================ */
+
+.code-editor-layout {
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+}
+
+.code-editor-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-lg);
+    width: 100%;
+    text-align: center;
+}
+
+.editor-toolbar-button {
+    min-width: var(--code-editor-btn-min-width);
+}
+
+.editor-title-input {
+    flex: 1;
+    text-align: center;
+}
+
+.code-editor-panel {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    margin: var(--spacing-lg) 0 0 0;
+    background: transparent;
+    color: var(--color-text-secondary);
+    border: 2px solid var(--color-text-secondary);
+    border-radius: var(--radius-sm);
+    overflow: auto;
+}
+
+.code-editor-content {
+    display: block;
+    width: 100%;
+    min-height: calc(100% - 68px);
+    font-family: 'Fira Mono', 'Consolas', monospace;
+    font-size: var(--font-size-lg);
+    background: transparent;
+    color: inherit;
+    white-space: pre;
+    overflow: auto;
+}
+
+.code-editor-content:focus-visible {
+    outline: none !important;
+}
+
+/* ============================================================================
+   GAME INFO COMPONENTS
+   ============================================================================ */
+
+.moves-list-scrollable {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: var(--spacing-sm);
+    border: 1px solid #ddd;
+    border-radius: var(--radius-sm);
+    background: #f9f9f9;
+}
+
+.moves-list-content {
+    padding: var(--spacing-sm);
+    min-height: 40px;
+}
+
+.move-pair {
+    display: flex;
+    align-items: center;
+    margin-bottom: var(--spacing-xs);
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: var(--font-size-sm);
+}
+
+.move-number {
+    font-weight: bold;
+    color: var(--color-text-dark);
+    min-width: 20px;
+    margin-right: var(--spacing-sm);
+}
+
+.move-notation {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+}
+
+.white-move, .black-move {
+    padding: 2px var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.white-move {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid #ccc;
+}
+
+.black-move {
+    background: rgba(0, 0, 0, 0.1);
+    border: 1px solid #999;
+}
+
+.black-move-placeholder {
+    /* Grid will automatically place this in the second column */
+    min-width: 0;
+}
+
+.white-move:hover, .black-move:hover {
+    background: rgba(0, 123, 255, 0.1);
+    border-color: #007bff;
+}
+
+.move-current {
+    background: rgba(0, 123, 255, 0.2) !important;
+    border-color: #007bff !important;
+    font-weight: bold;
+}
+
+/* Move History Controls */
+.move-history-header {
+    margin-bottom: var(--spacing-sm);
+}
+
+.move-history-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.move-history-controls button {
+    min-width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.move-history-controls button:disabled {
+    opacity: 0.4;
+    cursor: default;
+    transform: none;
+    box-shadow: none;
+    background-color: #ccc !important;
+    color: #666 !important;
+    border-color: #ccc !important;
+}
+
+/* Custom scrollbar for moves list */
+.moves-list-scrollable::-webkit-scrollbar {
+    width: 6px;
+}
+
+.moves-list-scrollable::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.moves-list-scrollable::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+}
+
+.moves-list-scrollable::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* ============================================================================
+   RESPONSIVE DESIGN
+   ============================================================================ */
+
+@media (min-width: 993px) {
+    .expand-on-large {
+        height: 100%;
+    }
+}
+
+@media (min-width: 601px) {
+    .expand-on-medium {
+        height: 100%;
+    }
+}
+
+@media (max-width: 600px) {    
+    .editor-toolbar-button {
+        min-width: 0px;
+    }
+
+    .editor-toolbar-button .editor-toolbar-button-label {
+        display: none;
+    }
+}
+
+/* ============================================================================
+   ACCESSIBILITY & INTERACTION
+   ============================================================================ */
+
+/* Focus indicators */
+*:focus-visible {
+    outline: 3px solid var(--color-focus-outline) !important;
+    outline-offset: -3px;
+}
+
+/* Visual feedback */
+.selection-toggle-button.w3-light-grey {
+    background-color: var(--color-button-selected-bg) !important;
+    color: var(--color-button-selected-text) !important;
 }

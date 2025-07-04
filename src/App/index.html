@@ -1,181 +1,226 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <title>Robotic Chess</title>
-        <link rel="stylesheet" href="w3.css">
-        <link rel="stylesheet" href="main.css">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    </head>
-    <body id="body">
-        <header class="w3-bar w3-dark-grey w3-padding w3-large" style="flex-shrink:0;">
-            <span class="w3-bar-item"><b>Robotic Chess</b></span>
-            <button id="OpenMenuBtn" class="w3-bar-item w3-button w3-right w3-round w3-hide-large" onclick="openMenu()">&#9776;</button>
-            <button id="CloseMenuBtn" class="w3-bar-item w3-button w3-right w3-round w3-hide-large w3-hide-medium w3-hide-small" onclick="closeMenu()">&times;</button>
-        </header>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robotic Chess</title>
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="w3.css">
+    <link rel="stylesheet" href="main.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="app-body">
+    <!-- Header -->
+    <header class="w3-bar w3-dark-grey w3-padding w3-large" style="flex-shrink:0;">
+        <span class="w3-bar-item"><b>Robotic Chess</b></span>
+        <button id="open-menu-btn" class="w3-bar-item w3-button w3-right w3-round w3-hide-large">
+            &#9776;
+        </button>
+        <button id="close-menu-btn" class="w3-bar-item w3-button w3-right w3-round w3-hide-large w3-hide-medium w3-hide-small">
+            &times;
+        </button>
+    </header>
 
-        <div class="w3-row content-container">
-            <nav id="Menu" class="sidemenu w3-col l2 m12 s12 w3-padding-small w3-hide-medium w3-hide-small" style="min-width:200px; flex-shrink:0;">
-                <div class="w3-padding w3-dark-grey w3-round" style="margin-top: 4px;"><b>Menu:</b></div>
-                <button class="w3-button w3-round" style="width: 100%;" onclick="const overlay = document.getElementById('new-game-overlay'); overlay.style.display = 'flex';">New Game</button>
-                <button class="w3-button w3-round" style="width: 100%;" onclick="undoMoveBtnPressed()">Undo</button>
-                <div class="w3-white w3-round w3-padding-small">
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span>Custom Bots:</span>
-                        <button class="w3-button w3-round w3-small w3-light-green" style="padding: 2px 8px; font-size: 12px; line-height: 1;" onclick="openCodeEditor('New Custom Bot', newBotCode)"><i class="fa fa-plus"></i> New</button>
-                    </div>
-                    <div id="bot-list-container"></div>
-                </div>
-            </nav>
-
-            <main class="w3-col l7 m9 s12 chess-container">
-                <div class="chess-board-container">
-                    <div id="player-top-display" class="player-text-container">
-                        <span id="player-top-name" class="w3-left" style="height: 100%; display: flex; align-items: center;"></span>
-                        <span id="player-top-timer" class="w3-right w3-padding-small w3-round-large clock" style="min-width: 75px; min-height: 31px; text-align: center; margin-left: 5px;"></span>
-                    </div>
-                    <div class="chess-board" id="chess-board"></div>
-                    <div id="player-bottom-display" class="player-text-container">
-                        <span id="player-bottom-name" class="w3-left" style="height: 100%; display: flex; align-items: center;"></span>
-                        <span id="player-bottom-timer" class="w3-right w3-padding-small w3-round-large clock" style="min-width: 75px; min-height: 31px; text-align: center; margin-left: 5px;"></span>
-                    </div>
-                </div>
-            </main>
-
-            <aside class="sidemenu w3-col l3 m3 s12 w3-padding-small" style="min-width: 220px; flex-shrink: 0;">
-                <div class="w3-padding w3-dark-grey w3-round" style="margin-top: 4px;"><b>Game Info:</b></div>
-                <div id="game-info">
-                    <!-- Game status, move list, etc. -->
-                </div>
-            </aside>
-        </div>
-
-        <div id="new-game-overlay" class="overlay" style="display: none;">
-            <div onclick="closeOverlay('new-game-overlay')" id="close-overlay-btn" class="w3-button w3-round" style="font-size: 18px; position: absolute; top: 8px; right: 16px; background: transparent; color: #fff;">&times;</div>
-            <div class="overlay-content">
-                <h2 class="w3-center" style="margin-bottom: 24px;">Start New Game</h2>
-                <form id="player-select-form" style="display: flex; flex-direction: column; gap: 18px;">
-                    <label style="color: #fff; display: flex; flex-direction: column; gap: 6px;">
-                        White Player:
-                        <div style="display: flex; align-items: center;">
-                            <select id="white-player-type" class="w3-select" style="flex: 1; display: none;" onchange="
-                                document.getElementById('show-white-bot').style.display = this.value == 'bot' ? 'flex' : 'none';
-                                localStorage.setItem('white-player-type', this.value);
-                                if (this.value == 'human') {
-                                    this.nextElementSibling.nextElementSibling.classList.remove('w3-light-grey', 'w3-hover-light-grey');
-                                    this.nextElementSibling.classList.add('w3-light-grey', 'w3-hover-light-grey');
-                                } else {
-                                    this.nextElementSibling.nextElementSibling.classList.add('w3-light-grey', 'w3-hover-light-grey');
-                                    this.nextElementSibling.classList.remove('w3-light-grey', 'w3-hover-light-grey');
-                                }
-                            ">
-                                <option value="human">Human</option>
-                                <option value="bot">Bot</option>
-                            </select>
-                            <button type="button" class="w3-button" style="flex: 1;" onclick="
-                                document.getElementById('white-player-type').value = 'human';
-                                document.getElementById('white-player-type').dispatchEvent(new Event('change'));
-                            ">Human</button>
-                            <button type="button" class="w3-button" style="flex: 1;" onclick="
-                                document.getElementById('white-player-type').value = 'bot';
-                                document.getElementById('white-player-type').dispatchEvent(new Event('change'));
-                            ">Bot</button>
-                        </div>
-                        <div id="show-white-bot" style="display: flex; flex-direction: column; gap: 5px;">  
-                            <select id="white-bot-type" style="height: 30px;" onchange="
-                                localStorage.setItem('white-bot-type', this.value);
-                                document.getElementById('white-bot-script').style.display = this.value == '*' ? 'block' : 'none';
-                            "></select>
-                            <input type="file" id="white-bot-script" style="display: none;" accept=".js">
-                        </div>
-                    </label>
-                    <label style="color: #fff; display: flex; flex-direction: column; gap: 6px;">
-                        Black Player:
-                        <div style="display: flex; align-items: center;">
-                            <select id="black-player-type" class="w3-select" style="flex: 1; display: none;" onchange="
-                                document.getElementById('show-black-bot').style.display = this.value == 'bot' ? 'flex' : 'none';
-                                localStorage.setItem('black-player-type', this.value);
-                                if (this.value == 'human') {
-                                    this.nextElementSibling.nextElementSibling.classList.remove('w3-light-grey', 'w3-hover-light-grey');
-                                    this.nextElementSibling.classList.add('w3-light-grey', 'w3-hover-light-grey');
-                                } else {
-                                    this.nextElementSibling.nextElementSibling.classList.add('w3-light-grey', 'w3-hover-light-grey');
-                                    this.nextElementSibling.classList.remove('w3-light-grey', 'w3-hover-light-grey');
-                                }
-                            ">
-                                <option value="human">Human</option>
-                                <option value="bot">Bot</option>
-                            </select>
-                            <button type="button" class="w3-button" style="flex: 1;" onclick="
-                                document.getElementById('black-player-type').value = 'human';
-                                document.getElementById('black-player-type').dispatchEvent(new Event('change'));
-                            ">Human</button>
-                            <button type="button" class="w3-button" style="flex: 1;" onclick="
-                                document.getElementById('black-player-type').value = 'bot';
-                                document.getElementById('black-player-type').dispatchEvent(new Event('change'));
-                            ">Bot</button>
-                        </div>
-                        <div id="show-black-bot" style="display: flex; flex-direction: column; gap: 5px;">
-                            <select id="black-bot-type" style="height: 30px;" onchange="
-                                localStorage.setItem('black-bot-type', this.value);
-                                document.getElementById('black-bot-script').style.display = this.value == '*' ? 'block' : 'none';
-                            "></select>
-                            <input type="file" id="black-bot-script" accept=".js">
-                        </div>
-                    </label>
-                    <label style="color: #fff; display: flex; flex-direction: column; gap: 6px;">
-                        Board Rotated To Player:
-                        <div style="display: flex; align-items: center;">
-                            <select id="board-rotated" class="w3-select" style="flex: 1; display: none;" onchange="
-                                localStorage.setItem('board-rotated', this.value);
-                                if (this.value == 'white') {
-                                    this.nextElementSibling.nextElementSibling.classList.remove('w3-light-grey', 'w3-hover-light-grey');
-                                    this.nextElementSibling.classList.add('w3-light-grey', 'w3-hover-light-grey');
-                                } else {
-                                    this.nextElementSibling.nextElementSibling.classList.add('w3-light-grey', 'w3-hover-light-grey');
-                                    this.nextElementSibling.classList.remove('w3-light-grey', 'w3-hover-light-grey');
-                                }
-                            ">
-                                <option value="white">White</option>
-                                <option value="black">Black</option>
-                            </select>
-                            <button type="button" class="w3-button" style="flex: 1;" onclick="
-                                document.getElementById('board-rotated').value = 'white';
-                                document.getElementById('board-rotated').dispatchEvent(new Event('change'));
-                            ">White</button>
-                            <button type="button" class="w3-button" style="flex: 1;" onclick="
-                                document.getElementById('board-rotated').value = 'black';
-                                document.getElementById('board-rotated').dispatchEvent(new Event('change'));
-                            ">Black</button>
-                        </div>
-                    </label>
-                    <button onclick="startGameBtnPressed()" type="button" id="start-game-btn" class="w3-button w3-green w3-round-large" style="margin-top: 18px;">Start Game</button>
-                </form>
+    <!-- Main Content Container -->
+    <div class="w3-row main-content-container">
+        <!-- Navigation Menu -->
+        <nav id="menu" class="app-sidemenu w3-col l2 m12 s12 w3-padding-small w3-hide-medium w3-hide-small" 
+             style="min-width:200px; flex-shrink:0;">
+            <div class="w3-padding w3-dark-grey w3-round menu-section" style="margin: var(--spacing-sm) 0;">
+                <b>Menu:</b>
             </div>
-        </div>
-
-        <div id="game-finished-overlay" class="overlay" style="display: none;">
-            <div onclick="closeOverlay('game-finished-overlay')" id="close-overlay-btn" class="w3-button w3-round" style="font-size: 18px; position: absolute; top: 8px; right: 16px; background: transparent; color: #fff;">&times;</div>
-            <div id="game-finished-overlay-content" class="overlay-content w3-center"></div>
-        </div>
-
-        <div id="code-editor-overlay" class="overlay" style="display: none;">
-            <div class="overlay-content fullscreen" style="display: flex; flex-direction: column; user-select: none;">
-                <div class="w3-center" style="display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%;">
-                    <button class="w3-button w3-round w3-red" style="min-width: 110px;" onclick="document.getElementById('code-editor-overlay').style.display = 'none'"><i class="fa fa-times"></i> Cancel</button>
-                    <input type="text" class="w3-input" style="flex: 1; text-align: center;" id="code-editor-title">
-                    <button class="w3-button w3-round w3-light-green" style="min-width: 110px;" onclick="saveCode()"><i class="fa fa-pencil"></i> Save</button>
+            
+            <!-- Game Controls -->
+            <button id="new-game-btn" class="w3-button w3-round" style="width: 100%;">
+                New Game
+            </button>
+            <!-- <button id="undo-move-btn" class="w3-button w3-round" style="width: 100%;">
+                Undo
+            </button> -->
+            
+            <!-- Custom Bots Section -->
+            <div class="w3-white w3-round w3-padding-small" style="margin-top: var(--spacing-sm);">
+                <div class="bot-list-header" style="display: flex; align-items: center; justify-content: space-between;">
+                    <span>Custom Bots:</span>
+                    <button id="new-bot-btn" class="w3-button w3-round w3-small w3-light-green" style="padding: 2px 8px; font-size: 12px; line-height: 1;">
+                        <i class="fa fa-plus"></i> New
+                    </button>
                 </div>
-                <pre class="code-editor" style="margin-top: 15px; margin-bottom: 0px;"><code id="code-editor" class="language-javascript" contenteditable="true" spellcheck="false"></code></pre>
-                <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
-                <script src="code-editor.js"></script>
+                <div id="bot-list-container"></div>
             </div>
-        </div>
+        </nav>
 
-        <iframe id="white-bot-iframe" sandbox="allow-scripts" style="display: none;"></iframe>
-        <iframe id="black-bot-iframe" sandbox="allow-scripts" style="display: none;"></iframe>
-        
-        <script type="module" src="main.js"></script>
-    </body>
+        <!-- Chess Board Area -->
+        <main class="w3-col l7 m9 s12 chess-game-container">
+            <div class="chess-board-wrapper">
+                <!-- Top Player Display -->
+                <div id="player-top-display" class="player-info-container">
+                    <span id="player-top-name" class="w3-left player-display-name"></span>
+                    <span id="player-top-timer" class="w3-right w3-padding-small w3-round-large game-timer timer-display"></span>
+                </div>
+                
+                <!-- Chess Board -->
+                <div class="chess-game-board" id="chess-board"></div>
+                
+                <!-- Bottom Player Display -->
+                <div id="player-bottom-display" class="player-info-container">
+                    <span id="player-bottom-name" class="w3-left player-display-name"></span>
+                    <span id="player-bottom-timer" class="w3-right w3-padding-small w3-round-large game-timer timer-display"></span>
+                </div>
+            </div>
+        </main>
+
+        <!-- Game Information Sidebar -->
+        <aside class="app-sidemenu w3-col l3 m3 s12 w3-padding-small" style="min-width: 220px; flex-shrink: 0;">
+            <div class="w3-padding w3-dark-grey w3-round menu-section" style="margin-top: 4px;">
+                <b>Game Info:</b>
+            </div>
+            <div id="game-info">
+                <!-- Game Status -->
+                <div class="w3-padding-small w3-white w3-round" style="margin-top: var(--spacing-sm);">
+                    <div class="w3-small w3-text-dark-grey"><b>Game Status:</b></div>
+                    <div id="game-status" class="w3-text-black">Ready to start</div>
+                </div>
+                
+                <!-- Move History -->
+                <div class="w3-padding-small w3-white w3-round" style="margin-top: var(--spacing-sm);">
+                    <div class="move-history-header" style="display: flex; align-items: center; justify-content: space-between;">
+                        <span class="w3-small w3-text-dark-grey"><b>Move History:</b></span>
+                        <div class="move-history-controls">
+                            <button id="undo-move-btn" class="w3-button w3-round w3-small w3-light-blue" style="padding: 2px 8px; font-size: 12px; line-height: 1; margin-right: 4px;">
+                                <i class="fa fa-undo"></i>
+                            </button>
+                            <button id="redo-move-btn" class="w3-button w3-round w3-small w3-light-blue" style="padding: 2px 8px; font-size: 12px; line-height: 1;">
+                                <i class="fa fa-repeat"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="moves-list-container" class="moves-list-scrollable">
+                        <div id="moves-list" class="moves-list-content">
+                            <div class="w3-text-grey w3-small">No moves yet</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- New Game Overlay -->
+    <div id="new-game-overlay" class="modal-overlay" style="display: none;">
+        <div class="modal-content-wrapper">
+            <button class="w3-button w3-round modal-close-button" data-close-overlay="new-game-overlay">
+                &times;
+            </button>
+            <h2 class="w3-center" style="margin-bottom: 24px;">Start New Game</h2>
+            
+            <form id="player-select-form" class="game-configuration-form">
+                <!-- White Player Selection -->
+                <div class="player-config-section">
+                    <label class="config-section-label">White Player:</label>
+                    <div class="button-selection-group">
+                        <select id="white-player-type" class="w3-select hidden-form-select">
+                            <option value="human">Human</option>
+                            <option value="bot">Bot</option>
+                        </select>
+                        <button type="button" class="w3-button selection-toggle-button" data-target="white-player-type" data-value="human">
+                            Human
+                        </button>
+                        <button type="button" class="w3-button selection-toggle-button" data-target="white-player-type" data-value="bot">
+                            Bot
+                        </button>
+                    </div>
+                    <div id="white-bot-config" class="bot-configuration-panel">
+                        <select id="white-bot-type" class="bot-selection-dropdown"></select>
+                        <input type="file" id="white-bot-script" class="bot-file-input" accept=".js">
+                    </div>
+                </div>
+
+                <!-- Black Player Selection -->
+                <div class="player-config-section">
+                    <label class="config-section-label">Black Player:</label>
+                    <div class="button-selection-group">
+                        <select id="black-player-type" class="w3-select hidden-form-select">
+                            <option value="human">Human</option>
+                            <option value="bot">Bot</option>
+                        </select>
+                        <button type="button" class="w3-button selection-toggle-button" data-target="black-player-type" data-value="human">
+                            Human
+                        </button>
+                        <button type="button" class="w3-button selection-toggle-button" data-target="black-player-type" data-value="bot">
+                            Bot
+                        </button>
+                    </div>
+                    <div id="black-bot-config" class="bot-configuration-panel">
+                        <select id="black-bot-type" class="bot-selection-dropdown"></select>
+                        <input type="file" id="black-bot-script" class="bot-file-input" accept=".js">
+                    </div>
+                </div>
+
+                <!-- Board Orientation Selection -->
+                <div class="player-config-section">
+                    <label class="config-section-label">Board Rotated To Player:</label>
+                    <div class="button-selection-group">
+                        <select id="board-rotated" class="w3-select hidden-form-select">
+                            <option value="white">White</option>
+                            <option value="black">Black</option>
+                        </select>
+                        <button type="button" class="w3-button selection-toggle-button" data-target="board-rotated" data-value="white">
+                            White
+                        </button>
+                        <button type="button" class="w3-button selection-toggle-button" data-target="board-rotated" data-value="black">
+                            Black
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Start Game Button -->
+                <button type="button" id="start-game-btn" class="w3-button w3-green w3-round-large form-submit-button">
+                    Start Game
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Game Finished Overlay -->
+    <div id="game-finished-overlay" class="modal-overlay" style="display: none;">
+        <div class="modal-content-wrapper w3-center">
+            <button class="w3-button w3-round modal-close-button" data-close-overlay="game-finished-overlay">
+                &times;
+            </button>
+            <div id="game-finished-overlay-content"></div>
+        </div>
+    </div>
+
+    <!-- Code Editor Overlay -->
+    <div id="code-editor-overlay" class="modal-overlay" style="display: none;">
+        <div class="modal-content-wrapper fullscreen-modal code-editor-layout">
+            <div class="code-editor-toolbar">
+                <button id="code-editor-cancel" class="w3-button w3-round w3-red editor-toolbar-button">
+                    <i class="fa fa-times"></i><span class="editor-toolbar-button-label"> Cancel</span>
+                </button>
+                <input type="text" class="w3-input editor-title-input" id="code-editor-title" placeholder="Bot Name">
+                <button id="code-editor-save" class="w3-button w3-round w3-light-green editor-toolbar-button">
+                    <i class="fa fa-save"></i><span class="editor-toolbar-button-label"> Save</span>
+                </button>
+            </div>
+            <pre class="code-editor-panel" style="padding-top: 0px; padding-bottom: 0px;">
+                <code id="code-editor" class="language-javascript code-editor-content" contenteditable="true" spellcheck="false"></code>
+            </pre>
+        </div>
+    </div>
+
+    <!-- Bot Communication Iframes -->
+    <iframe id="white-bot-iframe" sandbox="allow-scripts" style="display: none;" title="White Bot Communication"></iframe>
+    <iframe id="black-bot-iframe" sandbox="allow-scripts" style="display: none;" title="Black Bot Communication"></iframe>
+    
+    <!-- External Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="code-editor.js"></script>
+    
+    <!-- Main Application Script -->
+    <script type="module" src="main.js"></script>
+</body>
 </html>
