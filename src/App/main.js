@@ -23,11 +23,14 @@ const PIECE_IMAGES = {
 // Default bot code template for creating new custom bots
 const DEFAULT_BOT_CODE = `import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
 
+/*
+ * This function is called when it's the bot's turn
+ * @param {string} fen - The FEN string representing the current board state
+ * @returns {Chess.Move} The move to play
+ */
 export function think(fen) {
     const board = new Chess.Board(fen);
-    const moves = board.GetMoves();
-    const move = moves[Math.floor(Math.random() * moves.length)];
-    return move;
+    
 }`;
 
 // Timing constants for various update intervals (in milliseconds)
@@ -479,6 +482,14 @@ function resetTimers() {
  * @param {boolean} isWhite - Whether this bot plays as white
  */
 async function setupBot(bot, isWhite) {
+    const iframe = document.getElementById(isWhite ? 'white-bot-iframe' : 'black-bot-iframe');
+    
+    // Clean up previous message handler if it exists
+    if (iframe.messageHandler) {
+        window.removeEventListener('message', iframe.messageHandler);
+        iframe.messageHandler = null;
+    }
+    
     const moduleCode = `
         ${bot.code}
         window.addEventListener("message", async event => {
@@ -495,17 +506,24 @@ async function setupBot(bot, isWhite) {
         });
     `;
     
-    const iframe = document.getElementById(isWhite ? 'white-bot-iframe' : 'black-bot-iframe');
     iframe.srcdoc = `<!DOCTYPE html><html><body><script type="module">${moduleCode}<\/script></body></html>`;
     
-    // Set up message handler
-    window.addEventListener('message', function handler(event) {
+    // Set up message handler specific to this iframe
+    const messageHandler = function(event) {
+        // Only handle messages from this specific iframe
+        if (event.source !== iframe.contentWindow) return;
+        
         const { type, value } = event.data;
         if (type === 'move') {
             if (isWhite) whiteBotMove = value;
             else blackBotMove = value;
         }
-    });
+    };
+    
+    window.addEventListener('message', messageHandler);
+    
+    // Store the handler so we can remove it later if needed
+    iframe.messageHandler = messageHandler;
 
     // Wait for iframe to load
     await new Promise(resolve => {
@@ -588,6 +606,12 @@ function editBot(botName) {
     openCodeEditor(bot.name, bot.code);
 }
 
+function viewBot(botName) {
+    const bot = bots.find(b => b.name === botName);
+    if (!bot) return;
+    openCodeEditor(bot.name, bot.code, true); // true indicates read-only mode
+}
+
 function deleteBot(botName) {
     const botIndex = bots.findIndex(b => b.name === botName && b.isCustom);
     if (botIndex === -1) return;
@@ -620,6 +644,7 @@ async function refreshBotsList() {
         whiteBotTypeSelect.innerHTML += `<option value="${bot.name}">${botLabel}</option>`;
         blackBotTypeSelect.innerHTML += `<option value="${bot.name}">${botLabel}</option>`;
         
+        // Add all bots to the container (both custom and stock)
         if (bot.isCustom) {
             botListContainer.innerHTML += `
                 <div class="w3-padding-small w3-round-large bot-list-item">
@@ -631,12 +656,21 @@ async function refreshBotsList() {
                         <i class="fa fa-trash"></i>
                     </button>
                 </div>`;
+        } else {
+            // Stock bot - only show view button
+            botListContainer.innerHTML += `
+                <div class="w3-padding-small w3-round-large bot-list-item">
+                    <span class="bot-list-name">${bot.name}</span>
+                    <button class="w3-button w3-round w3-light-blue bot-list-btn" onclick="viewBot('${bot.name}')">
+                        <i class="fa fa-eye"></i>
+                    </button>
+                </div>`;
         }
     });
 
-    // Add custom option
-    whiteBotTypeSelect.innerHTML += '<option value="*">Custom</option>';
-    blackBotTypeSelect.innerHTML += '<option value="*">Custom</option>';
+    // // Add custom option
+    // whiteBotTypeSelect.innerHTML += '<option value="*">Import</option>';
+    // blackBotTypeSelect.innerHTML += '<option value="*">Import</option>';
 
     // Restore saved selections
     const whiteBotType = localStorage.getItem('white-bot-type');
@@ -656,10 +690,11 @@ async function refreshBotsList() {
 // CODE EDITOR FUNCTIONS
 // ============================================================================
 
-function openCodeEditor(botName, botCode) {
+function openCodeEditor(botName, botCode, readOnly = false) {
     const overlay = document.getElementById('code-editor-overlay');
     const codeElement = document.getElementById('code-editor');
     const titleElement = document.getElementById('code-editor-title');
+    const saveButton = document.getElementById('code-editor-save');
     
     // Store currently focused element
     window.lastFocusedElement = document.activeElement;
@@ -671,14 +706,83 @@ function openCodeEditor(botName, botCode) {
     codeElement.textContent = botCode;
     titleElement.value = botName;
     
+    // Configure read-only mode
+    if (readOnly) {
+        titleElement.disabled = false; // Keep enabled for selection
+        titleElement.readOnly = true; // Make it read-only instead of disabled
+        titleElement.style.cursor = 'text';
+        
+        codeElement.contentEditable = 'true'; // Keep editable for selection
+        codeElement.style.cursor = 'text';
+        
+        // Store handlers for cleanup
+        const keydownHandler = (e) => {
+            // Allow selection shortcuts but prevent editing
+            if (e.ctrlKey && (e.key === 'a' || e.key === 'c')) {
+                return; // Allow Ctrl+A (select all) and Ctrl+C (copy)
+            }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
+                e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
+                e.key === 'Home' || e.key === 'End' ||
+                e.key === 'PageUp' || e.key === 'PageDown') {
+                return; // Allow navigation
+            }
+            e.preventDefault(); // Prevent all other key inputs
+        };
+        
+        const pasteHandler = (e) => {
+            e.preventDefault(); // Prevent pasting
+        };
+        
+        const inputHandler = (e) => {
+            e.preventDefault(); // Prevent input
+        };
+        
+        codeElement.readOnlyKeyHandler = keydownHandler;
+        codeElement.readOnlyPasteHandler = pasteHandler;
+        codeElement.readOnlyInputHandler = inputHandler;
+        
+        codeElement.addEventListener('keydown', keydownHandler);
+        codeElement.addEventListener('paste', pasteHandler);
+        codeElement.addEventListener('input', inputHandler);
+        
+        if (saveButton) saveButton.style.display = 'none';
+    } else {
+        titleElement.disabled = false;
+        titleElement.readOnly = false;
+        titleElement.style.cursor = '';
+        
+        codeElement.contentEditable = 'true';
+        codeElement.style.cursor = '';
+        
+        // Remove read-only event listeners if they exist
+        if (codeElement.readOnlyKeyHandler) {
+            codeElement.removeEventListener('keydown', codeElement.readOnlyKeyHandler);
+            codeElement.removeEventListener('paste', codeElement.readOnlyPasteHandler);
+            codeElement.removeEventListener('input', codeElement.readOnlyInputHandler);
+            delete codeElement.readOnlyKeyHandler;
+            delete codeElement.readOnlyPasteHandler;
+            delete codeElement.readOnlyInputHandler;
+        }
+        
+        if (saveButton) saveButton.style.display = 'inline-block';
+    }
+    
     // Apply syntax highlighting if Prism is available
     if (typeof Prism !== 'undefined') {
         Prism.highlightElement(codeElement);
     }
     
-    // Focus the title input
+    // Focus the appropriate element
     setTimeout(() => {
-        titleElement.focus();
+        if (readOnly) {
+            const cancelButton = document.getElementById('code-editor-cancel');
+            if (cancelButton) {
+                cancelButton.focus();
+            }
+        } else {
+            titleElement.focus();
+        }
     }, 0);
 }
 
@@ -804,19 +908,19 @@ function convertMoveToAlgebraic(move, boardState, allMoves) {
     
     // Simulate the move to check for check/checkmate
     const tempBoard = new Chess.Board(boardState.GetFEN());
-    tempBoard.MakeMove(fromSquare, toSquare);
+    tempBoard.MakeMove(move);
     
     const gameOverState = tempBoard.IsGameOver();
     if (gameOverState.over) {
         if (gameOverState.reason === 'checkmate') {
             notation += '#';
         }
-    }
-
-    // Check if the move puts the opponent in check
-    const opponentKingInCheck = tempBoard.IsKingAttacked(tempBoard.whiteToPlay);
-    if (opponentKingInCheck) {
-        notation += '+';
+    } else {
+        // Check if the move puts the opponent in check
+        const opponentKingInCheck = tempBoard.IsKingAttacked(tempBoard.whiteToPlay);
+        if (opponentKingInCheck) {
+            notation += '+';
+        }
     }
     
     return notation;
@@ -919,7 +1023,7 @@ function navigateToMove(moveIndex) {
     // Replay moves up to the selected move
     for (let i = 0; i <= moveIndex; i++) {
         const moveData = moveHistory[i];
-        board.MakeMove(moveData.move.from, moveData.move.to);
+        board.MakeMove(moveData.move);
     }
     
     syncBoard();
@@ -986,9 +1090,9 @@ function redoMove() {
     
     if (nextMove) {
         // Make the move on the board
-        const result = board.MakeMove(nextMove.move.from, nextMove.move.to);
+        const result = board.MakeMove(nextMove.move);
         
-        if (result.moveResult !== 'illegal_move') {
+        if (result?.reason !== 'illegal move') {
             // Update the current move index
             currentMoveIndex = nextMoveIndex;
             
@@ -1023,32 +1127,30 @@ function redoMove() {
 
 /**
  * Makes a move on the board and handles move history management
- * @param {string} from - The source square (e.g., "E2")
- * @param {string} to - The destination square (e.g., "E4")
+ * @param {Chess.Move} move - The move to make
  * @returns {Object} The result of the move (success, game over, or illegal move)
  */
-function makeMove(from, to) {
+function makeMove(move) {
     // Check if we're making a move from a past position
     if (currentMoveIndex < moveHistory.length - 1) {
         const nextMoveIndex = currentMoveIndex + 1;
         const existingMove = moveHistory[nextMoveIndex];
         
         // Only clear future moves if the new move is different from the existing one
-        if (!existingMove || existingMove.move.from !== from || existingMove.move.to !== to) {
+        if (!existingMove || existingMove.move.from !== move.from || existingMove.move.to !== move.to) {
             moveHistory = moveHistory.slice(0, currentMoveIndex + 1);
         }
     }
     
     // Get algebraic notation before making the move
-    const move = new Chess.Move(from, to);
     const allMoves = board.GetMoves();
     const isWhiteMove = board.whiteToPlay;
     const algebraicNotation = convertMoveToAlgebraic(move, board, allMoves);
     
-    const result = board.MakeMove(from, to);
+    const result = board.MakeMove(move);
     
     // Handle illegal move
-    if (result.moveResult === 'illegal_move') {
+    if (result?.reason === 'illegal move') {
         return result;
     }
     
@@ -1056,9 +1158,9 @@ function makeMove(from, to) {
     addMoveToHistory(move, algebraicNotation, isWhiteMove);
 
     // Update visual board
-    clearSquare(from);
-    const piece = board.GetPiece(to);
-    updatePieceOnSquare(to, piece);
+    clearSquare(move.from);
+    const piece = board.GetPiece(move.to);
+    updatePieceOnSquare(move.to, piece);
 
     // Special moves may require full board sync
     if (result.requireSync) {
@@ -1201,7 +1303,7 @@ async function getUserInput() {
             dragState.dragImg.style.top = (e.pageY - dragState.offsetY) + 'px';
         }
 
-        function onDragEnd(e) {
+        async function onDragEnd(e) {
             if (!dragState.startSquare || !dragState.piece) {
                 cleanup();
                 return;
@@ -1224,10 +1326,19 @@ async function getUserInput() {
             }
             document.getElementById(dragState.startSquare).innerHTML = dragState.deletedPiece;
 
+            // Clean up drag event listeners before handling promotion to prevent interference
+            cleanup();
+
             // Check if move is valid
-            if (targetSquare && targetSquare !== dragState.startSquare &&
-                dragState.validMoves.some(move => move.to === targetSquare)) {
-                tryResolve(new Chess.Move(dragState.startSquare, targetSquare));
+            const move = dragState.validMoves.find(move => move.from === dragState.startSquare && move.to === targetSquare);
+            if (move) {
+                if (move.promotion) {
+                    // Handle promotion move - show promotion overlay
+                    move.promotion = await showPromotionOverlay();
+                    tryResolve(move);
+                } else {
+                    tryResolve(move);
+                }
             } else {
                 tryResolve(null);
             }
@@ -1255,13 +1366,12 @@ async function getBotInput() {
 
         // Fallback for missing bot
         if (!botIframe) {
-            const moves = board.GetMoves();
-            resolve(moves.length ? moves[Math.floor(Math.random() * moves.length)] : null);
-            return;
+            resolve(null);
         }
 
         // Send thinking request to bot
-        botIframe.contentWindow.postMessage({ type: 'think', value: board.GetFEN() }, "*");
+        const boardFEN = board.GetFEN();
+        botIframe.contentWindow.postMessage({ type: 'think', value: boardFEN }, "*");
 
         // Poll for bot response
         const moveCheck = setInterval(() => {
@@ -1276,7 +1386,11 @@ async function getBotInput() {
                 clearInterval(moveCheck);
                 clearInterval(undoCheck);
                 
-                const move = moveObj ? new Chess.Move(moveObj.from.toUpperCase(), moveObj.to.toUpperCase()) : null;
+                const move = moveObj ? new Chess.Move(
+                    moveObj.from.toUpperCase(), 
+                    moveObj.to.toUpperCase(), 
+                    moveObj.promotion || null
+                ) : null;
                 resolve(move);
             }
         }, BOT_POLL_INTERVAL);
@@ -1392,12 +1506,12 @@ async function gameLoop(whiteIsHuman, blackIsHuman) {
         // Process move
         if (!move || move.from === move.to) continue;
         
-        const moveResult = makeMove(move.from, move.to);
+        const moveResult = makeMove(move);
         
         // Handle illegal move - treat as loss
         if (moveResult.over && moveResult.reason === 'illegal move') {
-            // console.log(`%c[%c${board.whiteToPlay ? 'White' : 'Black'}%c] %cIllegal move %cfrom%c %c${move.from} %cto%c %c${move.to}`, 
-            //     '', '', '', 'color: red', 'color: darkgrey;', '', 'color: aqua', 'color: darkgrey;', '', 'color: aqua');
+            console.log(`%c[%c${board.whiteToPlay ? 'White' : 'Black'}%c] %cIllegal move %cfrom%c %c${move.from} %cto%c %c${move.to}`, 
+                '', '', '', 'color: red', 'color: darkgrey;', '', 'color: aqua', 'color: darkgrey;', '', 'color: aqua');
             return moveResult;
         }
         
@@ -1725,6 +1839,157 @@ function showNewGameOverlay() {
     }
 }
 
+/**
+ * Shows the promotion overlay and handles piece selection
+ * @returns {Promise<Chess.Move|null>} - A promise that resolves with the completed move or null if cancelled
+ */
+function showPromotionOverlay() {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('promotion-overlay');
+        const buttons = overlay.querySelectorAll('.promotion-piece-button');
+        
+        // Store currently focused element
+        window.lastFocusedElement = document.activeElement;
+        
+        // Add overlay active state
+        document.body.classList.add('modal-overlay-active');
+        
+        // Show overlay
+        overlay.style.display = 'flex';
+        
+        // Determine which color pieces to show
+        const isWhite = board.whiteToPlay;
+        const promotionPieces = Chess.GetPromotionPieces(isWhite);
+        
+        // Update button icons to show correct color pieces
+        buttons.forEach((button, index) => {
+            const piece = promotionPieces[index];
+            const icon = button.querySelector('.promotion-piece-icon');
+            
+            // Set piece image instead of unicode symbols
+            const pieceImage = getPieceImage(piece);
+            if (pieceImage) {
+                icon.innerHTML = `<img src="${pieceImage}" style="width: 40px; height: 40px;" draggable="false" 
+                    alt="${Chess.GetPieceName(piece)}" 
+                    onerror="this.style.display='none'; this.parentElement.style.fontSize='36px'; this.parentElement.innerHTML='${getUnicodeForPiece(piece)}';">`;
+            } else {
+                // Fallback to unicode symbols
+                icon.innerHTML = getUnicodeForPiece(piece);
+                icon.style.fontSize = '36px';
+            }
+        });
+        
+        // Set up click handlers for promotion pieces
+        let resolved = false;
+        
+        function handlePromotionChoice(selectedPiece) {
+            if (resolved) return;
+            resolved = true;
+            
+            // Hide overlay
+            overlay.style.display = 'none';
+            document.body.classList.remove('modal-overlay-active');
+            
+            // Restore focus
+            if (window.lastFocusedElement) {
+                window.lastFocusedElement.focus();
+            }
+            
+            // Clean up event listeners
+            buttons.forEach(btn => {
+                btn.removeEventListener('click', btn.promotionHandler);
+            });
+            document.removeEventListener('keydown', escapeHandler);
+            
+            // Create move with promotion
+            resolve(selectedPiece);
+        }
+        
+        // Add click handlers
+        buttons.forEach((button, index) => {
+            const piece = promotionPieces[index];
+            const handler = () => handlePromotionChoice(piece);
+            button.promotionHandler = handler;
+            button.addEventListener('click', handler);
+        });
+        
+        // Add escape key handler
+        const escapeHandler = (e) => {
+            if (e.key === 'Escape' && !resolved) {
+                resolved = true;
+                overlay.style.display = 'none';
+                document.body.classList.remove('modal-overlay-active');
+                
+                // Restore focus
+                if (window.lastFocusedElement) {
+                    window.lastFocusedElement.focus();
+                }
+                
+                // Clean up event listeners
+                buttons.forEach(btn => {
+                    btn.removeEventListener('click', btn.promotionHandler);
+                });
+                document.removeEventListener('keydown', escapeHandler);
+                
+                // Cancel the move
+                resolve(null);
+            }
+            
+            // Add keyboard shortcuts: Q, R, B, N
+            if (!resolved) {
+                let selectedPiece = null;
+                switch (e.key.toLowerCase()) {
+                    case 'q':
+                        selectedPiece = promotionPieces[0]; // Queen
+                        break;
+                    case 'r':
+                        selectedPiece = promotionPieces[1]; // Rook
+                        break;
+                    case 'b':
+                        selectedPiece = promotionPieces[2]; // Bishop
+                        break;
+                    case 'n':
+                        selectedPiece = promotionPieces[3]; // Knight
+                        break;
+                }
+                
+                if (selectedPiece) {
+                    e.preventDefault();
+                    handlePromotionChoice(selectedPiece);
+                }
+            }
+        };
+        
+        document.addEventListener('keydown', escapeHandler);
+        
+        // Focus the first button (Queen)
+        setTimeout(() => {
+            if (buttons[0]) {
+                buttons[0].focus();
+            }
+        }, 0);
+    });
+}
+
+/**
+ * Gets the Unicode symbol for a chess piece
+ * @param {number} piece - The piece type constant
+ * @returns {string} Unicode symbol for the piece
+ */
+function getUnicodeForPiece(piece) {
+    const unicodeMap = {
+        [Chess.Piece.WHITE_QUEEN]: '♕',
+        [Chess.Piece.WHITE_ROOK]: '♖',
+        [Chess.Piece.WHITE_BISHOP]: '♗',
+        [Chess.Piece.WHITE_KNIGHT]: '♘',
+        [Chess.Piece.BLACK_QUEEN]: '♛',
+        [Chess.Piece.BLACK_ROOK]: '♜',
+        [Chess.Piece.BLACK_BISHOP]: '♝',
+        [Chess.Piece.BLACK_KNIGHT]: '♞'
+    };
+    return unicodeMap[piece] || '?';
+}
+
 // ============================================================================
 // INITIALIZATION AND WINDOW EXPORTS
 // ============================================================================
@@ -1739,8 +2004,11 @@ window.redoMoveBtnPressed = redoMoveBtnPressed;
 window.openCodeEditor = openCodeEditor;
 window.saveCode = saveCode;
 window.editBot = editBot;
+window.viewBot = viewBot;
 window.deleteBot = deleteBot;
 window.newBotCode = DEFAULT_BOT_CODE;
+window.board = board;
+window.syncBoard = syncBoard;
 
 // Initialize the application
 /**

@@ -28,12 +28,77 @@ export default class Chess {
      * Uses algebraic notation (e.g., "E2" to "E4")
      */
     static Move = class {
-        constructor(from, to) {
+        constructor(from, to, promotion = null) {
             // Store coordinates directly for better performance
             this.from = from; // Starting square (e.g., "E2")
             this.to = to;     // Destination square (e.g., "E4")
+            this.promotion = promotion; // Promotion piece (Chess.Piece.WHITE_QUEEN, etc.) for pawn promotion moves
         }
     };
+
+    /**
+     * Get the display name of a piece for UI purposes
+     * @param {number} piece - The piece type constant
+     * @returns {string} Human-readable name of the piece
+     */
+    static GetPieceName(piece) {
+        switch (piece) {
+            case Chess.Piece.WHITE_PAWN:
+            case Chess.Piece.BLACK_PAWN:
+                return "Pawn";
+            case Chess.Piece.WHITE_ROOK:
+            case Chess.Piece.BLACK_ROOK:
+                return "Rook";
+            case Chess.Piece.WHITE_KNIGHT:
+            case Chess.Piece.BLACK_KNIGHT:
+                return "Knight";
+            case Chess.Piece.WHITE_BISHOP:
+            case Chess.Piece.BLACK_BISHOP:
+                return "Bishop";
+            case Chess.Piece.WHITE_QUEEN:
+            case Chess.Piece.BLACK_QUEEN:
+                return "Queen";
+            case Chess.Piece.WHITE_KING:
+            case Chess.Piece.BLACK_KING:
+                return "King";
+            default:
+                return "Unknown";
+        }
+    }
+
+    /**
+     * Get the FEN character representation of a piece
+     * @param {number} piece - The piece type constant
+     * @returns {string} FEN character for the piece
+     */
+    static GetPieceFEN(piece) {
+        switch (piece) {
+            case Chess.Piece.WHITE_PAWN: return "P";
+            case Chess.Piece.WHITE_ROOK: return "R";
+            case Chess.Piece.WHITE_KNIGHT: return "N";
+            case Chess.Piece.WHITE_BISHOP: return "B";
+            case Chess.Piece.WHITE_QUEEN: return "Q";
+            case Chess.Piece.WHITE_KING: return "K";
+            case Chess.Piece.BLACK_PAWN: return "p";
+            case Chess.Piece.BLACK_ROOK: return "r";
+            case Chess.Piece.BLACK_KNIGHT: return "n";
+            case Chess.Piece.BLACK_BISHOP: return "b";
+            case Chess.Piece.BLACK_QUEEN: return "q";
+            case Chess.Piece.BLACK_KING: return "k";
+            default: return "";
+        }
+    }
+
+    /**
+     * Get all available promotion pieces for a given color
+     * @param {boolean} isWhite - True for white pieces, false for black
+     * @returns {Array<number>} Array of piece constants for promotion
+     */
+    static GetPromotionPieces(isWhite) {
+        return isWhite ? 
+            [Chess.Piece.WHITE_QUEEN, Chess.Piece.WHITE_ROOK, Chess.Piece.WHITE_BISHOP, Chess.Piece.WHITE_KNIGHT] :
+            [Chess.Piece.BLACK_QUEEN, Chess.Piece.BLACK_ROOK, Chess.Piece.BLACK_BISHOP, Chess.Piece.BLACK_KNIGHT];
+    }
 
     // Pre-computed coordinate conversion arrays for performance
     static _files = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
@@ -256,7 +321,7 @@ export default class Chess {
             }
             return Chess.Piece.NONE;
         }
-        
+
         /**
          * Make a move using a Move object
          * @param {Chess.Move} move - The move to make
@@ -264,19 +329,6 @@ export default class Chess {
          * @returns {object} Result object with status, requireSync, and game over information
          */
         MakeMove(move, check_legal = true) {
-            return this.MakeMove(move.from, move.to, check_legal);
-        }
-
-        /**
-         * Execute a chess move on the board
-         * Handles all special moves: castling, en passant, pawn promotion
-         * Updates game state and move history
-         * @param {string} from - Starting square (e.g., "E2")
-         * @param {string} to - Destination square (e.g., "E4")
-         * @param {boolean} check_legal - Whether to validate move legality (Used for internal reasons)
-         * @returns {object} Result object with status, requireSync, and game over information
-         */
-        MakeMove(from, to, check_legal = true) {
             // Check if game is already over
             const initialGameOverState = this.IsGameOver();
             if (initialGameOverState.over) {
@@ -289,7 +341,7 @@ export default class Chess {
             // Validate move legality if requested
             if (check_legal) {
                 const legalMoves = this.GetMoves();
-                const isLegal = legalMoves.some(m => m.from === from && m.to === to);
+                const isLegal = legalMoves.some(m => m.from === move.from && m.to === move.to);
                 if (!isLegal) {
                     return { 
                         over: true,
@@ -303,8 +355,8 @@ export default class Chess {
             let requireSync = false; // Flag for special moves that need UI sync
 
             // Get pieces involved in the move
-            const fromPiece = this.GetPiece(from);
-            const toPiece = this.GetPiece(to);
+            const fromPiece = this.GetPiece(move.from);
+            const toPiece = this.GetPiece(move.to);
 
             // Save current castling rights for move history
             const oldCastlingRights = this.castlingRights;
@@ -314,15 +366,15 @@ export default class Chess {
 
             // Handle castling moves
             let castlingMove = false;
-            if (fromPiece === Chess.Piece.WHITE_KING && from === "E1") {
-                if (to === "G1" && (this.castlingRights & 1)) {
+            if (fromPiece === Chess.Piece.WHITE_KING && move.from === "E1") {
+                if (move.to === "G1" && (this.castlingRights & 1)) {
                     // White king-side castling
                     this.SetPiece(Chess.Piece.WHITE_KING, "G1");
                     this.SetPiece(Chess.Piece.NONE, "E1");
                     this.SetPiece(Chess.Piece.WHITE_ROOK, "F1");
                     this.SetPiece(Chess.Piece.NONE, "H1");
                     castlingMove = true;
-                } else if (to === "C1" && (this.castlingRights & 2)) {
+                } else if (move.to === "C1" && (this.castlingRights & 2)) {
                     // White queen-side castling
                     this.SetPiece(Chess.Piece.WHITE_KING, "C1");
                     this.SetPiece(Chess.Piece.NONE, "E1");
@@ -332,15 +384,15 @@ export default class Chess {
                 }
                 // King move removes all castling rights for that side
                 this.castlingRights &= ~3; // Clear bits 0 and 1
-            } else if (fromPiece === Chess.Piece.BLACK_KING && from === "E8") {
-                if (to === "G8" && (this.castlingRights & 4)) {
+            } else if (fromPiece === Chess.Piece.BLACK_KING && move.from === "E8") {
+                if (move.to === "G8" && (this.castlingRights & 4)) {
                     // Black king-side castling
                     this.SetPiece(Chess.Piece.BLACK_KING, "G8");
                     this.SetPiece(Chess.Piece.NONE, "E8");
                     this.SetPiece(Chess.Piece.BLACK_ROOK, "F8");
                     this.SetPiece(Chess.Piece.NONE, "H8");
                     castlingMove = true;
-                } else if (to === "C8" && (this.castlingRights & 8)) {
+                } else if (move.to === "C8" && (this.castlingRights & 8)) {
                     // Black queen-side castling
                     this.SetPiece(Chess.Piece.BLACK_KING, "C8");
                     this.SetPiece(Chess.Piece.NONE, "E8");
@@ -353,14 +405,14 @@ export default class Chess {
             }
 
             // Update castling rights when rooks move or are captured
-            if (fromPiece === Chess.Piece.WHITE_ROOK && from === "A1") this.castlingRights &= ~2;
-            if (fromPiece === Chess.Piece.WHITE_ROOK && from === "H1") this.castlingRights &= ~1;
-            if (fromPiece === Chess.Piece.BLACK_ROOK && from === "A8") this.castlingRights &= ~8;
-            if (fromPiece === Chess.Piece.BLACK_ROOK && from === "H8") this.castlingRights &= ~4;
-            if (to === "A1" && toPiece === Chess.Piece.WHITE_ROOK) this.castlingRights &= ~2;
-            if (to === "H1" && toPiece === Chess.Piece.WHITE_ROOK) this.castlingRights &= ~1;
-            if (to === "A8" && toPiece === Chess.Piece.BLACK_ROOK) this.castlingRights &= ~8;
-            if (to === "H8" && toPiece === Chess.Piece.BLACK_ROOK) this.castlingRights &= ~4;
+            if (fromPiece === Chess.Piece.WHITE_ROOK && move.from === "A1") this.castlingRights &= ~2;
+            if (fromPiece === Chess.Piece.WHITE_ROOK && move.from === "H1") this.castlingRights &= ~1;
+            if (fromPiece === Chess.Piece.BLACK_ROOK && move.from === "A8") this.castlingRights &= ~8;
+            if (fromPiece === Chess.Piece.BLACK_ROOK && move.from === "H8") this.castlingRights &= ~4;
+            if (move.to === "A1" && toPiece === Chess.Piece.WHITE_ROOK) this.castlingRights &= ~2;
+            if (move.to === "H1" && toPiece === Chess.Piece.WHITE_ROOK) this.castlingRights &= ~1;
+            if (move.to === "A8" && toPiece === Chess.Piece.BLACK_ROOK) this.castlingRights &= ~8;
+            if (move.to === "H8" && toPiece === Chess.Piece.BLACK_ROOK) this.castlingRights &= ~4;
 
             // Handle en passant captures and pawn double moves
             let enPassantCapture = false;
@@ -369,37 +421,37 @@ export default class Chess {
             
             if (fromPiece === Chess.Piece.WHITE_PAWN) {
                 // Check for pawn double move (creates en passant target)
-                if (from[1] === "2" && to[1] === "4") {
-                    this.enPassant = from[0] + "3";
+                if (move.from[1] === "2" && move.to[1] === "4") {
+                    this.enPassant = move.from[0] + "3";
                 }
                 // Check for en passant capture
-                if (to === prevEnPassant && from[0] !== to[0]) {
-                    const capSq = to[0] + (parseInt(to[1]) - 1);
+                if (move.to === prevEnPassant && move.from[0] !== move.to[0]) {
+                    const capSq = move.to[0] + (parseInt(move.to[1]) - 1);
                     this.SetPiece(Chess.Piece.NONE, capSq);
                     enPassantCapture = true;
                 }
             }
             if (fromPiece === Chess.Piece.BLACK_PAWN) {
                 // Check for pawn double move (creates en passant target)
-                if (from[1] === "7" && to[1] === "5") {
-                    this.enPassant = from[0] + "6";
+                if (move.from[1] === "7" && move.to[1] === "5") {
+                    this.enPassant = move.from[0] + "6";
                 }
                 // Check for en passant capture
-                if (to === prevEnPassant && from[0] !== to[0]) {
-                    const capSq = to[0] + (parseInt(to[1]) + 1);
+                if (move.to === prevEnPassant && move.from[0] !== move.to[0]) {
+                    const capSq = move.to[0] + (parseInt(move.to[1]) + 1);
                     this.SetPiece(Chess.Piece.NONE, capSq);
                     enPassantCapture = true;
                 }
             }
 
-            // Handle pawn promotion (always promote to queen for simplicity)
+            // Handle pawn promotion
             let promotion = null;
             let promotedPiece = null;
-            if (fromPiece === Chess.Piece.WHITE_PAWN && to[1] === "8") {
-                promotedPiece = Chess.Piece.WHITE_QUEEN;
+            if (fromPiece === Chess.Piece.WHITE_PAWN && move.to[1] === "8") {
+                promotedPiece = move.promotion || Chess.Piece.WHITE_QUEEN;
                 promotion = promotedPiece;
-            } else if (fromPiece === Chess.Piece.BLACK_PAWN && to[1] === "1") {
-                promotedPiece = Chess.Piece.BLACK_QUEEN;
+            } else if (fromPiece === Chess.Piece.BLACK_PAWN && move.to[1] === "1") {
+                promotedPiece = move.promotion || Chess.Piece.BLACK_QUEEN;
                 promotion = promotedPiece;
             }
 
@@ -411,17 +463,17 @@ export default class Chess {
             // Execute the actual piece movement (unless it's castling, already handled)
             if (!castlingMove) {
                 if (promotion) {
-                    this.SetPiece(promotedPiece, to);
-                    this.SetPiece(Chess.Piece.NONE, from);
+                    this.SetPiece(promotedPiece, move.to);
+                    this.SetPiece(Chess.Piece.NONE, move.from);
                 } else {
-                    this.SetPiece(fromPiece, to);
-                    this.SetPiece(Chess.Piece.NONE, from);
+                    this.SetPiece(fromPiece, move.to);
+                    this.SetPiece(Chess.Piece.NONE, move.from);
                 }
             }
             
             // Record the move in history for undo functionality
             this.moveHistory.push({
-                move: new Chess.Move(from, to),
+                move: new Chess.Move(move.from, move.to),
                 fromPiece: fromPiece,
                 toPiece: toPiece,
                 castlingMove,
@@ -893,16 +945,19 @@ export default class Chess {
          * Get a hash of the current position for caching and repetition detection
          */
         _getPositionHash() {
-            // Simple hash based on board position, turn, castling, and en passant
+            // Create a comprehensive hash based on all position-defining elements
             let hash = this.whiteToPlay ? 'w' : 'b';
-            hash += this.castlingRights.toString();
-            hash += this.enPassant || '-';
+            hash += '|' + this.castlingRights.toString();
+            hash += '|' + (this.enPassant || '-');
             
-            // Add board position (simplified)
+            // Add board position with separators to avoid collisions
+            hash += '|';
             for (let r = 0; r < 8; r++) {
                 for (let c = 0; c < 8; c++) {
                     hash += this.board[r][c].toString();
+                    if (c < 7) hash += ',';
                 }
+                if (r < 7) hash += '/';
             }
             
             return hash;
@@ -913,27 +968,21 @@ export default class Chess {
          * @returns {boolean} True if threefold repetition has occurred
          */
         IsThreefoldRepetition() {
-            if (!this.positionHistory || this.positionHistory.length < 6) {
-                return false; // Need at least 6 moves for threefold repetition
+            if (!this.positionHistory || this.positionHistory.length < 4) {
+                return false; // Need at least 4 positions for threefold repetition
             }
             
             const currentHash = this._getPositionHash();
             let count = 0;
             
-            // Only check positions with same turn (every 2 moves)
-            const step = 2;
-            const start = this.positionHistory.length - step;
-            
-            for (let i = start; i >= 0; i -= step) {
+            // Check the current position against ALL positions in history (including the first one)
+            for (let i = 0; i < this.positionHistory.length; i++) {
                 if (this.positionHistory[i] === currentHash) {
                     count++;
-                    if (count >= 2) { // Current position + 2 repetitions = threefold
-                        return true;
-                    }
                 }
             }
-            
-            return false;
+                        
+            return count >= 3; // Three occurrences = threefold repetition
         }
 
         /**
@@ -942,17 +991,32 @@ export default class Chess {
         _generatePawnMoves(r, c, from, isWhite, moves) {
             const direction = isWhite ? -1 : 1;
             const startRank = isWhite ? 6 : 1;
+            const promotionRank = isWhite ? 0 : 7; // 8th rank for white, 1st rank for black
             const enemyStart = isWhite ? Chess.Piece.BLACK_PAWN : Chess.Piece.WHITE_PAWN;
             const enemyEnd = isWhite ? Chess.Piece.BLACK_KING : Chess.Piece.WHITE_KING;
             
             // Forward moves
             const newR = r + direction;
             if (newR >= 0 && newR < 8 && this.board[newR][c] === Chess.Piece.NONE) {
-                moves.push(new Chess.Move(from, Chess.coordsToSquare(newR, c)));
+                const to = Chess.coordsToSquare(newR, c);
                 
-                // Double move from starting position
-                if (r === startRank && this.board[r + 2 * direction][c] === Chess.Piece.NONE) {
-                    moves.push(new Chess.Move(from, Chess.coordsToSquare(r + 2 * direction, c)));
+                // Check if this is a promotion move
+                if (newR === promotionRank) {
+                    // Generate all four promotion moves
+                    const promotionPieces = isWhite ? 
+                        [Chess.Piece.WHITE_QUEEN, Chess.Piece.WHITE_ROOK, Chess.Piece.WHITE_BISHOP, Chess.Piece.WHITE_KNIGHT] :
+                        [Chess.Piece.BLACK_QUEEN, Chess.Piece.BLACK_ROOK, Chess.Piece.BLACK_BISHOP, Chess.Piece.BLACK_KNIGHT];
+                    
+                    for (const piece of promotionPieces) {
+                        moves.push(new Chess.Move(from, to, piece));
+                    }
+                } else {
+                    moves.push(new Chess.Move(from, to));
+                    
+                    // Double move from starting position
+                    if (r === startRank && this.board[r + 2 * direction][c] === Chess.Piece.NONE) {
+                        moves.push(new Chess.Move(from, Chess.coordsToSquare(r + 2 * direction, c)));
+                    }
                 }
             }
             
@@ -962,7 +1026,21 @@ export default class Chess {
                 if (newR >= 0 && newR < 8 && newC >= 0 && newC < 8) {
                     const target = this.board[newR][newC];
                     if (target >= enemyStart && target <= enemyEnd) {
-                        moves.push(new Chess.Move(from, Chess.coordsToSquare(newR, newC)));
+                        const to = Chess.coordsToSquare(newR, newC);
+                        
+                        // Check if this is a promotion capture
+                        if (newR === promotionRank) {
+                            // Generate all four promotion moves
+                            const promotionPieces = isWhite ? 
+                                [Chess.Piece.WHITE_QUEEN, Chess.Piece.WHITE_ROOK, Chess.Piece.WHITE_BISHOP, Chess.Piece.WHITE_KNIGHT] :
+                                [Chess.Piece.BLACK_QUEEN, Chess.Piece.BLACK_ROOK, Chess.Piece.BLACK_BISHOP, Chess.Piece.BLACK_KNIGHT];
+                            
+                            for (const piece of promotionPieces) {
+                                moves.push(new Chess.Move(from, to, piece));
+                            }
+                        } else {
+                            moves.push(new Chess.Move(from, to));
+                        }
                     }
                 }
             }

@@ -40,10 +40,10 @@
                 Undo
             </button> -->
             
-            <!-- Custom Bots Section -->
+            <!-- Bots Section -->
             <div class="w3-white w3-round w3-padding-small" style="margin-top: var(--spacing-sm);">
                 <div class="bot-list-header" style="display: flex; align-items: center; justify-content: space-between;">
-                    <span>Custom Bots:</span>
+                    <span>Bots:</span>
                     <button id="new-bot-btn" class="w3-button w3-round w3-small w3-light-green" style="padding: 2px 8px; font-size: 12px; line-height: 1;">
                         <i class="fa fa-plus"></i> New
                     </button>
@@ -208,6 +208,37 @@
             <pre class="code-editor-panel" style="padding-top: 0px; padding-bottom: 0px;">
                 <code id="code-editor" class="language-javascript code-editor-content" contenteditable="true" spellcheck="false"></code>
             </pre>
+        </div>
+    </div>
+
+    <!-- Promotion Selection Overlay -->
+    <div id="promotion-overlay" class="modal-overlay" style="display: none;">
+        <div class="modal-content-wrapper w3-center">
+            <h3>Choose Promotion Piece</h3>
+            <p>Select which piece to promote your pawn to:</p>
+            <div class="promotion-pieces-container">
+                <button id="promote-queen" class="promotion-piece-button w3-button w3-round w3-border" data-piece="queen">
+                    <div class="promotion-piece-icon">♕</div>
+                    <div class="promotion-piece-label">Queen</div>
+                    <div class="promotion-piece-shortcut">(Q)</div>
+                </button>
+                <button id="promote-rook" class="promotion-piece-button w3-button w3-round w3-border" data-piece="rook">
+                    <div class="promotion-piece-icon">♖</div>
+                    <div class="promotion-piece-label">Rook</div>
+                    <div class="promotion-piece-shortcut">(R)</div>
+                </button>
+                <button id="promote-bishop" class="promotion-piece-button w3-button w3-round w3-border" data-piece="bishop">
+                    <div class="promotion-piece-icon">♗</div>
+                    <div class="promotion-piece-label">Bishop</div>
+                    <div class="promotion-piece-shortcut">(B)</div>
+                </button>
+                <button id="promote-knight" class="promotion-piece-button w3-button w3-round w3-border" data-piece="knight">
+                    <div class="promotion-piece-icon">♘</div>
+                    <div class="promotion-piece-label">Knight</div>
+                    <div class="promotion-piece-shortcut">(N)</div>
+                </button>
+            </div>
+            <p class="w3-small w3-text-grey" style="margin-top: 10px;">Press Q, R, B, or N keys, or click to select. Press Escape to cancel.</p>
         </div>
     </div>
 

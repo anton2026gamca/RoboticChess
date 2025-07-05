@@ -2,5 +2,17 @@
     {
         "name": "Dummy Bot",
         "url": "./Bots/dummy-bot.js"
+    },
+    {
+        "name": "Minimax Bot",
+        "url": "./Bots/minimax-bot.js"
+    },
+    {
+        "name": "Alpha-Beta Bot",
+        "url": "./Bots/alpha-beta-bot.js"
+    },
+    {
+        "name": "Negamax Bot",
+        "url": "./Bots/negamax-bot.js"
     }
 ]

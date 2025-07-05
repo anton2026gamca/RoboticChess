@@ -639,3 +639,75 @@
     background-color: var(--color-button-selected-bg) !important;
     color: var(--color-button-selected-text) !important;
 }
+
+/* ============================================================================
+   PROMOTION SELECTION UI
+   ============================================================================ */
+
+.promotion-pieces-container {
+    display: flex;
+    justify-content: center;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-lg);
+}
+
+.promotion-piece-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--spacing-lg) !important;
+    min-width: 80px;
+    min-height: 80px;
+    cursor: pointer;
+    transition: transform 0.03s ease;
+}
+
+.promotion-piece-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px var(--color-shadow);
+    background: var(--color-bg-secondary) !important;
+}
+
+.promotion-piece-button:active {
+    transform: translateY(0);
+}
+
+.promotion-piece-icon {
+    font-size: 36px;
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-text-primary);
+}
+
+.promotion-piece-label {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--color-text-primary);
+}
+
+.promotion-piece-shortcut {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-top: 2px;
+}
+
+/* Responsive design for promotion UI */
+@media (max-width: 600px) {
+    .promotion-pieces-container {
+        flex-wrap: wrap;
+        gap: var(--spacing-md);
+    }
+    
+    .promotion-piece-button {
+        min-width: 70px;
+        min-height: 70px;
+        padding: var(--spacing-md) !important;
+    }
+    
+    .promotion-piece-icon {
+        font-size: 28px;
+    }
+    
+    .promotion-piece-label {
+        font-size: 12px;
+    }
+}
