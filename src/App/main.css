@@ -256,17 +256,30 @@
     margin-top: 2px;
 }
 
-.bot-list-item .bot-list-btn {
+.bot-list-item .bot-list-badge {
     margin-left: 4px;
     padding: 0px;
     font-size: 14px;
     min-width: 28px;
-    display: none;
+    min-height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    outline: 4px solid #333;
 }
 
-.bot-list-item:hover .bot-list-btn {
-    display: inline-block !important;
+.bot-list-item .bot-list-badge.hover-only {
+    display: none;
+    outline: none;
+}
+
+.bot-list-item:hover .bot-list-badge.hover-only {
+    display: flex !important;
     outline: 4px solid #333;
+}
+
+.bot-list-item:hover .bot-list-badge.left {
+    left: 0;
 }
 
 .bot-list-item .bot-list-name {
@@ -274,6 +287,16 @@
     min-width: 0;
     overflow: show;
     white-space: nowrap;
+}
+
+.language-color.js {
+    background: #f7e018;
+    color: black;
+}
+
+.language-color.ts {
+    background: #3178c6;
+    color: black;
 }
 
 /* Bot list items */
@@ -482,6 +505,15 @@
 .editor-title-input {
     flex: 1;
     text-align: center;
+}
+
+.editor-language-select {
+    min-width: 120px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: var(--radius-sm);
+    background: white;
+    font-size: 14px;
 }
 
 /* ============================================================================

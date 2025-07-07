@@ -20,8 +20,8 @@ const PIECE_IMAGES = {
     [Chess.Piece.BLACK_KING]: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg'
 };
 
-// Default bot code template for creating new custom bots
-const DEFAULT_BOT_CODE = `import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
+// Default bot code templates for creating new custom bots
+const DEFAULT_BOT_CODE_JS = `import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
 
 /**
  * This function is called when it's the bot's turn
@@ -31,6 +31,18 @@ const DEFAULT_BOT_CODE = `import Chess from "https://anton2026gamca.github.io/Ro
 export function think(fen) {
     const board = new Chess.Board(fen);
     
+}`;
+
+const DEFAULT_BOT_CODE_TS = `import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
+
+/**
+ * This function is called when it's the bot's turn
+ * @param fen The FEN string representing the current board state
+ * @returns The move to play
+ */
+export function think(fen: string): Chess.Move | null {
+    const board = new Chess.Board(fen);
+
 }`;
 
 // Timing constants for various update intervals (in milliseconds)
@@ -50,12 +62,14 @@ class Bot {
      * Creates a new Bot instance
      * @param {string} name - The name of the bot
      * @param {string} url - URL to load bot code from (empty for custom bots)
-     * @param {string} code - The bot's JavaScript code (for custom bots)
+     * @param {string} code - The bot's JavaScript/TypeScript code (for custom bots)
+     * @param {string} language - The language of the bot ('js' or 'ts')
      */
-    constructor(name, url = '', code = '') {
+    constructor(name, url = '', code = '', language = 'js') {
         this.name = name;
         this.url = url;
         this.code = code;
+        this.language = language;
         this.isCustom = url === '';
         
         if (!this.isCustom) {
@@ -73,6 +87,17 @@ class Bot {
         } catch (err) {
             console.error(`Failed to load bot code from ${this.url}:`, err);
         }
+    }
+
+    /**
+     * Compiles TypeScript code to JavaScript if needed
+     * @returns {string} The compiled JavaScript code
+     */
+    async getCompiledCode() {
+        if (this.language === 'ts') {
+            return await compileTypeScript(this.code);
+        }
+        return this.code;
     }
 }
 
@@ -198,11 +223,12 @@ function handleOverlayKeydown(event) {
         event.preventDefault();
         
         // Find the visible overlay and close it
-        const overlays = ['new-game-overlay', 'game-finished-overlay'];
-        for (const overlayId of overlays) {
-            const overlay = document.getElementById(overlayId);
+        const blacklist = ['promotion-overlay', 'code-editor-overlay'];
+        const overlays = Array.from(document.querySelectorAll('.modal-overlay'))
+            .filter(overlay => !blacklist.includes(overlay.id));
+        for (const overlay of overlays) {
             if (overlay && overlay.style.display !== 'none') {
-                closeOverlay(overlayId);
+                closeOverlay(overlay.id);
                 return;
             }
         }
@@ -490,8 +516,11 @@ async function setupBot(bot, isWhite) {
         iframe.messageHandler = null;
     }
     
+    // Get compiled code (handles TypeScript compilation if needed)
+    const compiledCode = await bot.getCompiledCode();
+    
     const moduleCode = `
-        ${bot.code}
+        ${compiledCode}
         window.addEventListener("message", async event => {
             const { type, value } = event.data;
             if (type === "think") {
@@ -559,12 +588,14 @@ async function loadBots() {
 
         // Add default bots
         defaultBots.forEach(botData => {
-            bots.push(new Bot(botData.name, botData.url));
+            bots.push(new Bot(botData.name, botData.url, '', botData.url.split('.').pop().toLowerCase() || 'js'));
         });
         
         // Add custom bots
         customBots.forEach(botData => {
-            bots.push(new Bot(botData.name, '', botData.code));
+            // Handle legacy bots that don't have language property
+            const language = botData.language || 'js';
+            bots.push(new Bot(botData.name, '', botData.code, language));
         });
     } catch (error) {
         console.error('Failed to load bots:', error);
@@ -576,9 +607,10 @@ async function loadBots() {
  * @param {string} name - The name of the bot
  * @param {string} url - The URL for the bot code (empty for custom bots)
  * @param {string} code - The bot's code (for custom bots)
+ * @param {string} language - The language of the bot ('js' or 'ts')
  * @returns {Bot} The created bot instance
  */
-function addBot(name, url = '', code = '') {
+function addBot(name, url = '', code = '', language = 'js') {
     // Remove existing bot with same name
     bots = bots.filter(b => !(b.name === name && b.isCustom));
     
@@ -589,11 +621,11 @@ function addBot(name, url = '', code = '') {
         customBots = JSON.parse(botsStr);
     }
     customBots = customBots.filter(b => b.name !== name);
-    customBots.push({ name, code });
+    customBots.push({ name, code, language });
     localStorage.setItem('custom-bots', JSON.stringify(customBots));
     
     // Create and add new bot
-    const bot = new Bot(name, url, code);
+    const bot = new Bot(name, url, code, language);
     bots.push(bot);
     
     refreshBotsList();
@@ -603,13 +635,13 @@ function addBot(name, url = '', code = '') {
 function editBot(botName) {
     const bot = bots.find(b => b.name === botName);
     if (!bot) return;
-    openCodeEditor(bot.name, bot.code);
+    openCodeEditor(bot.name, bot.code, false, bot.language);
 }
 
-function viewBot(botName) {
-    const bot = bots.find(b => b.name === botName);
+function viewBot(botName, isCustom = null, botLanguage = null, botUrl = null, botCode = null) {
+    const bot = bots.find(b => b.name === botName && (!botUrl || botUrl === b.url) && (!botCode || botCode === b.code) && (isCustom !== null ? b.isCustom === isCustom : true) && (!botLanguage || b.language === botLanguage));
     if (!bot) return;
-    openCodeEditor(bot.name, bot.code, true); // true indicates read-only mode
+    openCodeEditor(bot.name, bot.code, true, bot.language); // true indicates read-only mode
 }
 
 function deleteBot(botName) {
@@ -631,6 +663,7 @@ function deleteBot(botName) {
 async function saveBot() {
     const overlay = document.getElementById('code-editor-overlay');
     const titleElement = document.getElementById('code-editor-title');
+    const languageElement = document.getElementById('code-editor-language');
     
     // Remove overlay active state and restore focus
     document.body.classList.remove('modal-overlay-active');
@@ -640,8 +673,9 @@ async function saveBot() {
     // Get code from Monaco Editor
     const code = window.getEditorValue ? window.getEditorValue() : '';
     const title = titleElement.value.trim();
+    const language = languageElement ? languageElement.value : 'js';
 
-    const bot = addBot(title, '', code);
+    const bot = addBot(title, '', code, language);
 
     // Update active bots if they match
     if (whiteBotInstance?.name && title === whiteBotInstance.name) {
@@ -671,30 +705,34 @@ async function refreshBotsList() {
 
     // Populate bot lists
     bots.forEach(bot => {
-        const botLabel = `${bot.isCustom ? '* ' : ''}${bot.name}`;
+        const languageIndicator = bot.language != 'js' ? ` [${bot.language.toUpperCase()}]` : '';
+        const botLabel = `${bot.isCustom ? '* ' : ''}${bot.name}${languageIndicator}`;
         whiteBotTypeSelect.innerHTML += `<option value="${bot.name}">${botLabel}</option>`;
         blackBotTypeSelect.innerHTML += `<option value="${bot.name}">${botLabel}</option>`;
         
         // Add all bots to the container (both custom and stock)
+        const langBadge = `<span class="w3-tag w3-round w3-small bot-list-badge language-color ${bot.language}"><b>${bot.language.toUpperCase()}</b></span>`;
         if (bot.isCustom) {
             botListContainer.innerHTML += `
                 <div class="w3-padding-small w3-round-large bot-list-item">
                     <span class="bot-list-name">* ${bot.name}</span>
-                    <button class="w3-button w3-round w3-light-green bot-list-btn" onclick="editBot('${bot.name}')">
+                    <button class="w3-button w3-round w3-light-green bot-list-badge hover-only" onclick="editBot('${bot.name}')">
                         <i class="fa fa-pencil"></i>
                     </button>
-                    <button class="w3-button w3-round w3-red bot-list-btn" onclick="deleteBot('${bot.name}')">
+                    <button class="w3-button w3-round w3-red bot-list-badge hover-only" onclick="deleteBot('${bot.name}')">
                         <i class="fa fa-trash"></i>
                     </button>
+                    ${langBadge}
                 </div>`;
         } else {
             // Stock bot - only show view button
             botListContainer.innerHTML += `
                 <div class="w3-padding-small w3-round-large bot-list-item">
                     <span class="bot-list-name">${bot.name}</span>
-                    <button class="w3-button w3-round w3-light-blue bot-list-btn" onclick="viewBot('${bot.name}')">
+                    <button class="w3-button w3-round w3-light-blue bot-list-badge hover-only" onclick="viewBot('${bot.name}', false, '${bot.language}', '${bot.url}')">
                         <i class="fa fa-eye"></i>
                     </button>
+                    ${langBadge}
                 </div>`;
         }
     });
@@ -724,11 +762,13 @@ async function refreshBotsList() {
 /**
  * Opens the code editor with bot name and code
  * @param {string} botName - The name of the bot
- * @param {string} botCode - The bot's JavaScript code
+ * @param {string} botCode - The bot's JavaScript/TypeScript code
  * @param {boolean} readOnly - Whether the editor should be read-only
+ * @param {string} language - The language of the bot ('js' or 'ts')
  */
-function openCodeEditor(botName, botCode, readOnly = false) {
+function openCodeEditor(botName, botCode, readOnly = false, language = 'js') {
     const titleElement = document.getElementById('code-editor-title');
+    const languageElement = document.getElementById('code-editor-language');
     
     // Set the bot name in the title input
     if (titleElement) {
@@ -746,8 +786,27 @@ function openCodeEditor(botName, botCode, readOnly = false) {
         }
     }
     
+    // Set the language selection
+    if (languageElement) {
+        languageElement.value = language;
+        
+        // Disable language selection for existing bots (as requested)
+        if (botName !== 'New Custom Bot') {
+            languageElement.disabled = true;
+        } else {
+            languageElement.disabled = false;
+        }
+        
+        // Also disable for read-only mode
+        if (readOnly) {
+            languageElement.disabled = true;
+        }
+    }
+    
     if (window.openEditor) {
-        window.openEditor(botCode, readOnly);
+        // Determine the Monaco editor language
+        const editorLanguage = language === 'ts' ? 'typescript' : 'javascript';
+        window.openEditor(botCode, readOnly, editorLanguage);
     }
 }
 
@@ -1126,6 +1185,343 @@ function undoMove() {
 }
 
 /**
+ * Shows a dialog to select the piece for promotion
+ * @returns {Promise<string>} Promise that resolves to the selected piece type ('queen', 'rook', 'bishop', 'knight')
+ */
+function showPromotionOverlay() {
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('promotion-overlay');
+        const buttons = overlay.querySelectorAll('.promotion-piece-button');
+        
+        overlay.style.display = 'flex';
+        
+        const handleSelection = (event) => {
+            const piece = event.currentTarget.dataset.piece;
+            overlay.style.display = 'none';
+            
+            // Remove event listeners
+            buttons.forEach(button => {
+                button.removeEventListener('click', handleSelection);
+            });
+            document.removeEventListener('keydown', handleKeyPress);
+            
+            resolve(piece);
+        };
+        
+        const handleKeyPress = (event) => {
+            let piece = null;
+            switch(event.key.toLowerCase()) {
+                case 'q':
+                    piece = 'queen';
+                    break;
+                case 'r':
+                    piece = 'rook';
+                    break;
+                case 'b':
+                    piece = 'bishop';
+                    break;
+                case 'n':
+                    piece = 'knight';
+                    break;
+                default:
+                    return; // Don't handle other keys
+            }
+            
+            overlay.style.display = 'none';
+            
+            // Remove event listeners
+            buttons.forEach(button => {
+                button.removeEventListener('click', handleSelection);
+            });
+            document.removeEventListener('keydown', handleKeyPress);
+            
+            resolve(piece);
+        };
+        
+        // Add event listeners
+        buttons.forEach(button => {
+            button.addEventListener('click', handleSelection);
+        });
+        document.addEventListener('keydown', handleKeyPress);
+    });
+}
+
+// ============================================================================
+// INITIALIZATION AND WINDOW EXPORTS
+// ============================================================================
+
+// Export functions to window object for HTML onclick handlers
+window.openMenu = openMenu;
+window.closeMenu = closeMenu;
+window.closeOverlay = closeOverlay;
+window.startGameBtnPressed = startGameBtnPressed;
+window.undoMoveBtnPressed = undoMoveBtnPressed;
+window.showPromotionOverlay = showPromotionOverlay;
+window.redoMoveBtnPressed = redoMoveBtnPressed;
+window.openCodeEditor = openCodeEditor;
+window.saveBot = saveBot;
+window.editBot = editBot;
+window.viewBot = viewBot;
+window.showNewBotDialog = showNewBotDialog;
+window.newBotCode = DEFAULT_BOT_CODE_JS;
+window.board = board;
+window.syncBoard = syncBoard;
+window.deleteBot = deleteBot;
+
+// Initialize the application
+/**
+ * Main application initialization function - sets up the entire chess application
+ */
+async function initializeApp() {
+    // Set up event listeners
+    setupEventListeners();
+    
+    // Create initial board
+    createBoard(whiteOnBottom);
+    syncBoard();
+
+    // Initialize game status
+    updateGameStatus();
+    
+    // Initialize button states
+    updateUndoRedoButtons();
+
+    // Load settings from localStorage
+    loadSettings();
+    
+    // Load bots
+    await loadBots();
+    refreshBotsList();
+
+    await initializeMonaco(document.getElementById('code-editor'));
+}
+
+/**
+ * Loads saved settings from localStorage and applies them to the UI
+ */
+function loadSettings() {
+    const whiteType = localStorage.getItem('white-player-type') || 'human';
+    const blackType = localStorage.getItem('black-player-type') || 'bot';
+    const rotated = localStorage.getItem('board-rotated') || 'white';
+
+    const whitePlayerTypeElement = document.getElementById('white-player-type');
+    const blackPlayerTypeElement = document.getElementById('black-player-type');
+    const boardRotatedElement = document.getElementById('board-rotated');
+    
+    whitePlayerTypeElement.value = whiteType;
+    whitePlayerTypeElement.dispatchEvent(new Event('change'));
+    
+    blackPlayerTypeElement.value = blackType;
+    blackPlayerTypeElement.dispatchEvent(new Event('change'));
+    
+    boardRotatedElement.value = rotated;
+    boardRotatedElement.dispatchEvent(new Event('change'));
+
+    document.getElementById('white-bot-script').style.display = whiteType === 'bot' ? 'block' : 'none';
+    document.getElementById('black-bot-script').style.display = blackType === 'bot' ? 'block' : 'none';
+}
+
+// Start the application when DOM is loaded
+window.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+});
+
+// ============================================================================
+// DOM EVENT HANDLING
+// ============================================================================
+
+function setupEventListeners() {
+    // Menu buttons
+    const openMenuBtn = document.getElementById('open-menu-btn');
+    const closeMenuBtn = document.getElementById('close-menu-btn');
+    const newGameBtn = document.getElementById('new-game-btn');
+    const undoBtn = document.getElementById('undo-move-btn');
+    const redoBtn = document.getElementById('redo-move-btn');
+    const newBotBtn = document.getElementById('new-bot-btn');
+    const startGameBtn = document.getElementById('start-game-btn');
+    const codeEditorSave = document.getElementById('code-editor-save');
+    const codeEditorCancel = document.getElementById('code-editor-cancel');
+    const selectJsBot = document.getElementById('select-js-bot');
+    const selectTsBot = document.getElementById('select-ts-bot');
+
+    // Add event listeners
+    if (openMenuBtn) openMenuBtn.addEventListener('click', openMenu);
+    if (closeMenuBtn) closeMenuBtn.addEventListener('click', closeMenu);
+    if (newGameBtn) newGameBtn.addEventListener('click', showNewGameOverlay);
+    if (undoBtn) undoBtn.addEventListener('click', undoMoveBtnPressed);
+    if (redoBtn) redoBtn.addEventListener('click', redoMoveBtnPressed);
+    if (newBotBtn) newBotBtn.addEventListener('click', showNewBotDialog);
+    if (startGameBtn) startGameBtn.addEventListener('click', startGameBtnPressed);
+    if (codeEditorSave) codeEditorSave.addEventListener('click', saveBot);
+    if (codeEditorCancel) {
+        codeEditorCancel.addEventListener('click', () => {
+            if (window.closeEditor) {
+                window.closeEditor();
+            } else {
+                const overlay = document.getElementById('code-editor-overlay');
+                overlay.style.display = 'none';
+                document.body.classList.remove('modal-overlay-active');
+                
+                // Restore focus to the previously focused element
+                if (window.lastFocusedElement) {
+                    window.lastFocusedElement.focus();
+                    window.lastFocusedElement = null;
+                }
+            }
+        });
+    }
+    selectJsBot.addEventListener('click', () => {
+        closeOverlay('new-bot-language-dialog');
+        openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE_JS, false, 'js');
+    });
+
+    selectTsBot.addEventListener('click', () => {
+        closeOverlay('new-bot-language-dialog');
+        openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE_TS, false, 'ts');
+    });
+
+    // Focus trap for overlays
+    document.addEventListener('keydown', handleOverlayKeydown);
+    
+    // Overlay close buttons
+    document.querySelectorAll('[data-close-overlay]').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const overlayId = e.target.getAttribute('data-close-overlay');
+            closeOverlay(overlayId);
+        });
+    });
+
+    // Player type selection buttons
+    document.querySelectorAll('.selection-toggle-button').forEach(button => {
+        button.addEventListener('click', (e) => {
+            const target = e.target.getAttribute('data-target');
+            const value = e.target.getAttribute('data-value');
+            const selectElement = document.getElementById(target);
+            
+            if (selectElement) {
+                selectElement.value = value;
+                selectElement.dispatchEvent(new Event('change'));
+            }
+        });
+    });
+
+    // Player type change handlers
+    setupPlayerTypeHandlers();
+    setupBotTypeHandlers();
+}
+
+function setupPlayerTypeHandlers() {
+    const selects = ['white-player-type', 'black-player-type', 'board-rotated'];
+
+    selects.forEach(select => {
+        const element = document.getElementById(select);
+        if (element) {
+            element.addEventListener('change', (e) => {
+                handleSelectChange(e.target);
+            });
+        }
+    });
+}
+
+function setupBotTypeHandlers() {
+    const botTypes = ['white-bot-type', 'black-bot-type'];
+    
+    botTypes.forEach(typeId => {
+        const element = document.getElementById(typeId);
+        if (element) {
+            element.addEventListener('change', (e) => {
+                handleBotTypeChange(e.target);
+            });
+        }
+    });
+}
+
+function handleSelectChange(selectElement) {
+    const value = selectElement.value;
+    const id = selectElement.id;
+    
+    // Save to localStorage
+    localStorage.setItem(id, value);
+    
+    // Update button visual states
+    updateButtonStates(selectElement);
+
+    if (id.includes('-player-type')) {
+        const botConfig = document.getElementById(`${id.includes('white') ? 'white' : 'black'}-bot-config`);
+        if (botConfig) {
+            botConfig.style.display = value === 'bot' ? 'flex' : 'none';
+        }
+    }
+
+    // Show/hide bot selection
+    if (id.includes('player-type')) {
+        const color = id.includes('white') ? 'white' : 'black';
+        const botSection = document.getElementById(`${color}-bot-type`);
+        const scriptInput = document.getElementById(`${color}-bot-script`);
+        
+        if (botSection) {
+            botSection.style.display = value === 'bot' ? 'flex' : 'none';
+        }
+        if (scriptInput) {
+            scriptInput.style.display = (value === 'bot' && botSection.value == "*") ? 'block' : 'none';
+        }
+    }
+}
+
+function handleBotTypeChange(selectElement) {
+    const value = selectElement.value;
+    const id = selectElement.id;
+    
+    // Save to localStorage
+    localStorage.setItem(id, value);
+    
+    // Show/hide script input for custom bots
+    const color = id.includes('white') ? 'white' : 'black';
+    const scriptInput = document.getElementById(`${color}-bot-script`);
+    
+    if (scriptInput) {
+        scriptInput.style.display = value === '*' ? 'block' : 'none';
+    }
+}
+
+function updateButtonStates(selectElement) {
+    const container = selectElement.parentElement;
+    const buttons = container.querySelectorAll('.selection-toggle-button');
+    const selectedValue = selectElement.value;
+    
+    buttons.forEach(button => {
+        const buttonValue = button.getAttribute('data-value');
+        if (buttonValue === selectedValue) {
+            button.classList.add('w3-light-grey', 'w3-hover-light-grey');
+        } else {
+            button.classList.remove('w3-light-grey', 'w3-hover-light-grey');
+        }
+    });
+}
+
+function showNewGameOverlay() {
+    const overlay = document.getElementById('new-game-overlay');
+    if (overlay) {
+        // Store currently focused element
+        window.lastFocusedElement = document.activeElement;
+        
+        // Add overlay active state
+        document.body.classList.add('modal-overlay-active');
+        
+        // Show overlay
+        overlay.style.display = 'flex';
+        
+        // Focus the first focusable element in the overlay
+        setTimeout(() => {
+            const firstFocusable = overlay.querySelector('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (firstFocusable) {
+                firstFocusable.focus();
+            }
+        }, 0);
+    }
+}
+
+/**
  * Gets user input via mouse drag-and-drop interface for making moves
  * @returns {Promise<Chess.Move|null>} Promise that resolves to a move or null if cancelled
  */
@@ -1456,20 +1852,12 @@ async function gameLoop(whiteIsHuman, blackIsHuman) {
         
         // Handle game over result from move
         if (moveResult.over) {
-            // console.info(`%c[%c${!board.whiteToPlay ? 'White' : 'Black'}%c] %cMove: %cfrom%c %c${move.from} %cto%c %c${move.to}`, 
-            //     '', '', '', '', 'color: darkgrey;', '', 'color: aqua', 'color: darkgrey;', '', 'color: aqua');
             return moveResult;
         }
-        
-        // console.info(`%c[%c${!board.whiteToPlay ? 'White' : 'Black'}%c] %cMove: %cfrom%c %c${move.from} %cto%c %c${move.to}`, 
-        //     '', '', '', '', 'color: darkgrey;', '', 'color: aqua', 'color: darkgrey;', '', 'color: aqua');
     }
 }
 
 function displayGameResult(gameResult) {
-    // console.log(`Game finished\nWinner: %c${gameResult.winner}%c\nReason: %c${gameResult.reason}`, 
-    //     'color: aqua;', '', 'color: aqua');
-    
     if (gameResult.reason !== 'game interrupted') {
         const overlay = document.getElementById('game-finished-overlay');
         const overlayContent = document.getElementById('game-finished-overlay-content');
@@ -1497,6 +1885,54 @@ function displayGameResult(gameResult) {
                 closeButton.focus();
             }
         }, 0);
+    }
+}
+
+// ============================================================================
+// TYPESCRIPT COMPILATION
+// ============================================================================
+
+/**
+ * Compiles TypeScript code to JavaScript using the TypeScript compiler
+ * @param {string} tsCode - The TypeScript code to compile
+ * @returns {string} The compiled JavaScript code
+ */
+async function compileTypeScript(tsCode) {
+    try {
+        // Load TypeScript compiler for the browser
+        if (!window.ts) {
+            // Try to load TypeScript from CDN
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/typescript@latest/lib/typescript.js';
+            document.head.appendChild(script);
+            
+            // Wait for TypeScript to load
+            await new Promise((resolve, reject) => {
+                script.onload = resolve;
+                script.onerror = reject;
+            });
+        }
+        
+        // Compile options
+        const compilerOptions = {
+            target: window.ts.ScriptTarget.ES2020,
+            module: window.ts.ModuleKind.ESNext,
+            moduleResolution: window.ts.ModuleResolutionKind.Node10,
+            strict: true,
+            esModuleInterop: true,
+            skipLibCheck: true,
+            forceConsistentCasingInFileNames: true,
+            declaration: false,
+            sourceMap: false
+        };
+
+        // Compile the TypeScript code
+        const result = window.ts.transpile(tsCode, compilerOptions);
+        
+        return result;
+    } catch (error) {
+        console.error('TypeScript compilation error:', error);
+        throw new Error(`Failed to compile TypeScript: ${error.message}`);
     }
 }
 
@@ -1611,412 +2047,19 @@ function updateUndoRedoButtons() {
     }
 }
 
-// ============================================================================
-// DOM EVENT HANDLING
-// ============================================================================
-
-function setupEventListeners() {
-    // Menu buttons
-    const openMenuBtn = document.getElementById('open-menu-btn');
-    const closeMenuBtn = document.getElementById('close-menu-btn');
-    const newGameBtn = document.getElementById('new-game-btn');
-    const undoBtn = document.getElementById('undo-move-btn');
-    const redoBtn = document.getElementById('redo-move-btn');
-    const newBotBtn = document.getElementById('new-bot-btn');
-    const startGameBtn = document.getElementById('start-game-btn');
-    const codeEditorSave = document.getElementById('code-editor-save');
-    const codeEditorCancel = document.getElementById('code-editor-cancel');
-
-    // Add event listeners
-    if (openMenuBtn) openMenuBtn.addEventListener('click', openMenu);
-    if (closeMenuBtn) closeMenuBtn.addEventListener('click', closeMenu);
-    if (newGameBtn) newGameBtn.addEventListener('click', showNewGameOverlay);
-    if (undoBtn) undoBtn.addEventListener('click', undoMoveBtnPressed);
-    if (redoBtn) redoBtn.addEventListener('click', redoMoveBtnPressed);
-    if (newBotBtn) newBotBtn.addEventListener('click', () => openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE));
-    if (startGameBtn) startGameBtn.addEventListener('click', startGameBtnPressed);
-    if (codeEditorSave) codeEditorSave.addEventListener('click', saveBot);
-    if (codeEditorCancel) {
-        codeEditorCancel.addEventListener('click', () => {
-            if (window.closeEditor) {
-                window.closeEditor();
-            } else {
-                const overlay = document.getElementById('code-editor-overlay');
-                overlay.style.display = 'none';
-                document.body.classList.remove('modal-overlay-active');
-                
-                // Restore focus to the previously focused element
-                if (window.lastFocusedElement) {
-                    window.lastFocusedElement.focus();
-                    window.lastFocusedElement = null;
-                }
-            }
-        });
-    }
-
-    // Focus trap for overlays
-    document.addEventListener('keydown', handleOverlayKeydown);
-    // Overlay close buttons
-    document.querySelectorAll('[data-close-overlay]').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const overlayId = e.target.getAttribute('data-close-overlay');
-            closeOverlay(overlayId);
-        });
-    });
-
-    // Player type selection buttons
-    document.querySelectorAll('.selection-toggle-button').forEach(button => {
-        button.addEventListener('click', (e) => {
-            const target = e.target.getAttribute('data-target');
-            const value = e.target.getAttribute('data-value');
-            const selectElement = document.getElementById(target);
-            
-            if (selectElement) {
-                selectElement.value = value;
-                selectElement.dispatchEvent(new Event('change'));
-            }
-        });
-    });
-
-    // Player type change handlers
-    setupPlayerTypeHandlers();
-    setupBotTypeHandlers();
-}
-
-function setupPlayerTypeHandlers() {
-    const selects = ['white-player-type', 'black-player-type', 'board-rotated'];
-
-    selects.forEach(select => {
-        const element = document.getElementById(select);
-        if (element) {
-            element.addEventListener('change', (e) => {
-                handleSelectChange(e.target);
-            });
-        }
-    });
-}
-
-function setupBotTypeHandlers() {
-    const botTypes = ['white-bot-type', 'black-bot-type'];
-    
-    botTypes.forEach(typeId => {
-        const element = document.getElementById(typeId);
-        if (element) {
-            element.addEventListener('change', (e) => {
-                handleBotTypeChange(e.target);
-            });
-        }
-    });
-}
-
-function handleSelectChange(selectElement) {
-    const value = selectElement.value;
-    const id = selectElement.id;
-    
-    // Save to localStorage
-    localStorage.setItem(id, value);
-    
-    // Update button visual states
-    updateButtonStates(selectElement);
-
-    if (id.includes('-player-type')) {
-        const botConfig = document.getElementById(`${id.includes('white') ? 'white' : 'black'}-bot-config`);
-        botConfig.style.display = value === 'bot' ? 'flex' : 'none';
-    }
-
-    // Show/hide bot selection
-    if (id.includes('player-type')) {
-        const color = id.includes('white') ? 'white' : 'black';
-        const botSection = document.getElementById(`${color}-bot-type`);
-        const scriptInput = document.getElementById(`${color}-bot-script`);
-        
-        if (botSection) {
-            botSection.style.display = value === 'bot' ? 'flex' : 'none';
-        }
-        if (scriptInput) {
-            scriptInput.style.display = (value === 'bot' && botSection.value == "*") ? 'block' : 'none';
-        }
-    }
-}
-
-function handleBotTypeChange(selectElement) {
-    const value = selectElement.value;
-    const id = selectElement.id;
-    
-    // Save to localStorage
-    localStorage.setItem(id, value);
-    
-    // Show/hide script input for custom bots
-    const color = id.includes('white') ? 'white' : 'black';
-    const scriptInput = document.getElementById(`${color}-bot-script`);
-    
-    if (scriptInput) {
-        scriptInput.style.display = value === '*' ? 'block' : 'none';
-    }
-}
-
-function updateButtonStates(selectElement) {
-    const container = selectElement.parentElement;
-    const buttons = container.querySelectorAll('.selection-toggle-button');
-    const selectedValue = selectElement.value;
-    
-    buttons.forEach(button => {
-        const buttonValue = button.getAttribute('data-value');
-        if (buttonValue === selectedValue) {
-            button.classList.add('w3-light-grey', 'w3-hover-light-grey');
-        } else {
-            button.classList.remove('w3-light-grey', 'w3-hover-light-grey');
-        }
-    });
-}
-
-function showNewGameOverlay() {
-    const overlay = document.getElementById('new-game-overlay');
-    if (overlay) {
-        // Store currently focused element
-        window.lastFocusedElement = document.activeElement;
-        
-        // Add overlay active state
-        document.body.classList.add('modal-overlay-active');
-        
-        // Show overlay
-        overlay.style.display = 'flex';
-        
-        // Focus the first focusable element in the overlay
-        setTimeout(() => {
-            const firstFocusable = overlay.querySelector('button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
-            if (firstFocusable) {
-                firstFocusable.focus();
-            }
-        }, 0);
-    }
-}
-
 /**
- * Shows the promotion overlay and handles piece selection
- * @returns {Promise<Chess.Move|null>} - A promise that resolves with the completed move or null if cancelled
+ * Shows a dialog to select the language for a new bot
  */
-function showPromotionOverlay() {
-    return new Promise((resolve) => {
-        const overlay = document.getElementById('promotion-overlay');
-        const buttons = overlay.querySelectorAll('.promotion-piece-button');
-        
-        // Store currently focused element
-        window.lastFocusedElement = document.activeElement;
-        
-        // Add overlay active state
-        document.body.classList.add('modal-overlay-active');
-        
-        // Show overlay
-        overlay.style.display = 'flex';
-        
-        // Determine which color pieces to show
-        const isWhite = board.whiteToPlay;
-        const promotionPieces = Chess.getPromotionPieces(isWhite);
-        
-        // Update button icons to show correct color pieces
-        buttons.forEach((button, index) => {
-            const piece = promotionPieces[index];
-            const icon = button.querySelector('.promotion-piece-icon');
-            
-            // Set piece image instead of unicode symbols
-            const pieceImage = getPieceImage(piece);
-            if (pieceImage) {
-                icon.innerHTML = `<img src="${pieceImage}" style="width: 40px; height: 40px;" draggable="false" 
-                    alt="${Chess.getPieceName(piece)}" 
-                    onerror="this.style.display='none'; this.parentElement.style.fontSize='36px'; this.parentElement.innerHTML='${getUnicodeForPiece(piece)}';">`;
-            } else {
-                // Fallback to unicode symbols
-                icon.innerHTML = getUnicodeForPiece(piece);
-                icon.style.fontSize = '36px';
-            }
-        });
-        
-        // Set up click handlers for promotion pieces
-        let resolved = false;
-        
-        function handlePromotionChoice(selectedPiece) {
-            if (resolved) return;
-            resolved = true;
-            
-            // Hide overlay
-            overlay.style.display = 'none';
-            document.body.classList.remove('modal-overlay-active');
-            
-            // Restore focus
-            if (window.lastFocusedElement) {
-                window.lastFocusedElement.focus();
-            }
-            
-            // Clean up event listeners
-            buttons.forEach(btn => {
-                btn.removeEventListener('click', btn.promotionHandler);
-            });
-            document.removeEventListener('keydown', escapeHandler);
-            
-            // Create move with promotion
-            resolve(selectedPiece);
-        }
-        
-        // Add click handlers
-        buttons.forEach((button, index) => {
-            const piece = promotionPieces[index];
-            const handler = () => handlePromotionChoice(piece);
-            button.promotionHandler = handler;
-            button.addEventListener('click', handler);
-        });
-        
-        // Add escape key handler
-        const escapeHandler = (e) => {
-            if (e.key === 'Escape' && !resolved) {
-                resolved = true;
-                overlay.style.display = 'none';
-                document.body.classList.remove('modal-overlay-active');
-                
-                // Restore focus
-                if (window.lastFocusedElement) {
-                    window.lastFocusedElement.focus();
-                }
-                
-                // Clean up event listeners
-                buttons.forEach(btn => {
-                    btn.removeEventListener('click', btn.promotionHandler);
-                });
-                document.removeEventListener('keydown', escapeHandler);
-                
-                // Cancel the move
-                resolve(null);
-            }
-            
-            // Add keyboard shortcuts: Q, R, B, N
-            if (!resolved) {
-                let selectedPiece = null;
-                switch (e.key.toLowerCase()) {
-                    case 'q':
-                        selectedPiece = promotionPieces[0]; // Queen
-                        break;
-                    case 'r':
-                        selectedPiece = promotionPieces[1]; // Rook
-                        break;
-                    case 'b':
-                        selectedPiece = promotionPieces[2]; // Bishop
-                        break;
-                    case 'n':
-                        selectedPiece = promotionPieces[3]; // Knight
-                        break;
-                }
-                
-                if (selectedPiece) {
-                    e.preventDefault();
-                    handlePromotionChoice(selectedPiece);
-                }
-            }
-        };
-        
-        document.addEventListener('keydown', escapeHandler);
-        
-        // Focus the first button (Queen)
-        setTimeout(() => {
-            if (buttons[0]) {
-                buttons[0].focus();
-            }
-        }, 0);
-    });
+function showNewBotDialog() {
+    const dialog = document.getElementById('new-bot-language-dialog');
+    dialog.style.display = 'flex';
+    document.body.classList.add('modal-overlay-active');
+    
+    // Store currently focused element
+    window.lastFocusedElement = document.activeElement;
+    
+    // Focus first button
+    setTimeout(() => {
+        document.getElementById('select-js-bot').focus();
+    }, 0);
 }
-
-/**
- * Gets the Unicode symbol for a chess piece
- * @param {number} piece - The piece type constant
- * @returns {string} Unicode symbol for the piece
- */
-function getUnicodeForPiece(piece) {
-    const unicodeMap = {
-        [Chess.Piece.WHITE_QUEEN]: '♕',
-        [Chess.Piece.WHITE_ROOK]: '♖',
-        [Chess.Piece.WHITE_BISHOP]: '♗',
-        [Chess.Piece.WHITE_KNIGHT]: '♘',
-        [Chess.Piece.BLACK_QUEEN]: '♛',
-        [Chess.Piece.BLACK_ROOK]: '♜',
-        [Chess.Piece.BLACK_BISHOP]: '♝',
-        [Chess.Piece.BLACK_KNIGHT]: '♞'
-    };
-    return unicodeMap[piece] || '?';
-}
-
-// ============================================================================
-// INITIALIZATION AND WINDOW EXPORTS
-// ============================================================================
-
-// Export functions to window object for HTML onclick handlers
-window.openMenu = openMenu;
-window.closeMenu = closeMenu;
-window.closeOverlay = closeOverlay;
-window.startGameBtnPressed = startGameBtnPressed;
-window.undoMoveBtnPressed = undoMoveBtnPressed;
-window.redoMoveBtnPressed = redoMoveBtnPressed;
-window.openCodeEditor = openCodeEditor;
-window.saveBot = saveBot;
-window.editBot = editBot;
-window.viewBot = viewBot;
-window.deleteBot = deleteBot;
-window.newBotCode = DEFAULT_BOT_CODE;
-window.board = board;
-window.syncBoard = syncBoard;
-
-// Initialize the application
-/**
- * Main application initialization function - sets up the entire chess application
- */
-async function initializeApp() {
-    // Set up event listeners
-    setupEventListeners();
-    
-    // Create initial board
-    createBoard(whiteOnBottom);
-    syncBoard();
-
-    // Initialize game status
-    updateGameStatus();
-    
-    // Initialize button states
-    updateUndoRedoButtons();
-
-    // Load settings from localStorage
-    loadSettings();
-    
-    // Load bots
-    await loadBots();
-    refreshBotsList();
-
-    await initializeMonaco(document.getElementById('code-editor'));
-}
-
-/**
- * Loads saved settings from localStorage and applies them to the UI
- */
-function loadSettings() {
-    const whiteType = localStorage.getItem('white-player-type') || 'human';
-    const blackType = localStorage.getItem('black-player-type') || 'bot';
-    const rotated = localStorage.getItem('board-rotated') || 'white';
-
-    const whitePlayerTypeElement = document.getElementById('white-player-type');
-    const blackPlayerTypeElement = document.getElementById('black-player-type');
-    const boardRotatedElement = document.getElementById('board-rotated');
-    
-    whitePlayerTypeElement.value = whiteType;
-    whitePlayerTypeElement.dispatchEvent(new Event('change'));
-    
-    blackPlayerTypeElement.value = blackType;
-    blackPlayerTypeElement.dispatchEvent(new Event('change'));
-    
-    boardRotatedElement.value = rotated;
-    boardRotatedElement.dispatchEvent(new Event('change'));
-
-    document.getElementById('white-bot-script').style.display = whiteType === 'bot' ? 'block' : 'none';
-    document.getElementById('black-bot-script').style.display = blackType === 'bot' ? 'block' : 'none';
-}
-
-// Start the application when DOM is loaded
-window.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
-});

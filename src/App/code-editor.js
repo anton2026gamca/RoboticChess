@@ -15,7 +15,7 @@ let monacoEditorInstance = null;
 let isMonacoInitialized = false;
 
 // Initialize Monaco Editor
-async function initializeMonaco(container, initialValue = '', readOnly = false) {
+async function initializeMonaco(container, initialValue = '', readOnly = false, language = 'javascript') {
     try {
         // Show loading state
         container.classList.add('loading');
@@ -29,11 +29,12 @@ async function initializeMonaco(container, initialValue = '', readOnly = false) 
         // Remove loading state
         container.classList.remove('loading');
         
-        // Initialize Monaco
+        // Initialize Monaco with language
         monacoEditorInstance = await window.MonacoEditor.initialize(
             container, 
             initialValue, 
-            readOnly
+            readOnly,
+            language
         );
         
         isMonacoInitialized = true;
@@ -103,7 +104,7 @@ function closeEditor() {
 }
 
 // Open editor function - main entry point
-async function openEditor(code, readOnly = false) {
+async function openEditor(code, readOnly = false, language = 'javascript') {
     const saveButton = document.getElementById('code-editor-save');
     
     // Store currently focused element
@@ -115,8 +116,8 @@ async function openEditor(code, readOnly = false) {
     codeEditorOverlay.style.display = 'flex';
     
     try {
-        // Initialize Monaco Editor
-        await initializeMonaco(codeEditor, code, readOnly);
+        // Initialize Monaco Editor with language
+        await initializeMonaco(codeEditor, code, readOnly, language);
         
         // Configure save button visibility
         if (saveButton) {

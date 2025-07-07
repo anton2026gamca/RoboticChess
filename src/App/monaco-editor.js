@@ -380,26 +380,6 @@ function loadMonacoEditor() {
                 
                 // Setup semantic tokenization
                 setupSemanticTokenization();
-
-                // Fetch runtime module
-                fetch('https://anton2026gamca.github.io/RoboticChess/src/App/chess.js')
-                    .then(res => res.text())
-                    .then(code => {
-                        // Wrap it inside a 'declare module' with exports inferred
-                        const wrapped = `
-                            declare module 'https://anton2026gamca.github.io/RoboticChess/src/App/chess.js' {
-                                ${code}
-                            }
-                        `;
-
-                        // Inject into Monaco as virtual declaration
-                        monaco.languages.typescript.javascriptDefaults.addExtraLib(
-                            wrapped,
-                            'file:///node_modules/@types/chess-url/index.d.ts'
-                        );
-                    })
-                    .catch(err => console.error('[Monaco] chess.js fetch error:', err));
-
                 
                 // Set up global error handler for Monaco
                 window.monaco.editor.onDidCreateModel((model) => {
@@ -439,8 +419,7 @@ function registerCustomThemes() {
 function setupJavaScriptLanguageFeatures() {
     if (!window.monaco) return;
     
-    // Enhanced JavaScript language configuration
-    monaco.languages.setLanguageConfiguration('javascript', {
+    const languageConfig = {
         comments: {
             lineComment: '//',
             blockComment: ['/*', '*/']
@@ -477,9 +456,13 @@ function setupJavaScriptLanguageFeatures() {
             decreaseIndentPattern: /^((?!.*?\/\*).*)*[\}\]\)]/
         },
         wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g
-    });
+    };
 
-    // Enhanced tokenization rules for JavaScript
+    // Enhanced language configuration
+    monaco.languages.setLanguageConfiguration('javascript', languageConfig);
+    monaco.languages.setLanguageConfiguration('typescript', languageConfig);
+
+    // Enhanced tokenization rules
     monaco.languages.setMonarchTokensProvider('javascript', {
         defaultToken: 'invalid',
         tokenPostfix: '.js',
@@ -546,6 +529,205 @@ function setupJavaScriptLanguageFeatures() {
                         '@default': ['entity.name.function', '', 'delimiter.parenthesis']
                     }
                 }],
+                
+                // identifiers and keywords
+                [/[a-z_$][\w$]*/, {
+                    cases: {
+                        '@controlKeywords': 'keyword.control',
+                        '@declarationKeywords': 'keyword.declaration',
+                        '@otherKeywords': 'keyword.other',
+                        '@default': 'identifier'
+                    }
+                }],
+                [/[A-Z][\w\$]*/, 'type.identifier'],
+                
+                // whitespace
+                { include: '@whitespace' },
+                
+                // regular expression
+                [/\/(?=([^\\\/]|\\.)+\/([gimsuy]*)(\s*)(\.|;|,|\)|\]|\}|$))/, { token: 'regexp', bracket: '@open', next: '@regexp' }],
+                
+                // delimiters and operators
+                [/[()\[\]]/, '@brackets'],
+                [/[<>](?!@symbols)/, '@brackets'],
+                [/@symbols/, {
+                    cases: {
+                        '@operators': 'operator',
+                        '@default': ''
+                    }
+                }],
+                
+                // numbers
+                [/(@digits)[eE]([\-+]?(@digits))?[fFdD]?/, 'number.float'],
+                [/(@digits)\.(@digits)([eE][\-+]?(@digits))?[fFdD]?/, 'number.float'],
+                [/0[xX](@hexdigits)[Ll]?/, 'number.hex'],
+                [/0[oO]?(@octaldigits)[Ll]?/, 'number.octal'],
+                [/0[bB](@binarydigits)[Ll]?/, 'number.binary'],
+                [/(@digits)[fFdD]/, 'number.float'],
+                [/(@digits)[lL]?/, 'number'],
+                
+                // delimiter: after number because of .\d floats
+                [/[;,.]/, 'delimiter'],
+                
+                // strings
+                [/"([^"\\]|\\.)*$/, 'string.invalid'],
+                [/'([^'\\]|\\.)*$/, 'string.invalid'],
+                [/"/, 'string', '@string_double'],
+                [/'/, 'string', '@string_single'],
+                [/`/, 'string', '@string_backtick'],
+            ],
+            
+            whitespace: [
+                [/[ \t\r\n]+/, ''],
+                [/\/\*\*(?!\/)/, 'comment.doc', '@jsdoc'],
+                [/\/\*/, 'comment', '@comment'],
+                [/\/\/.*$/, 'comment'],
+            ],
+            
+            comment: [
+                [/[^\/*]+/, 'comment'],
+                [/\*\//, 'comment', '@pop'],
+                [/[\/*]/, 'comment']
+            ],
+            
+            jsdoc: [
+                [/@\w+(\s+\{[^}]*\})?/, { 
+                    token: '@rematch',
+                    next: '@jsdoc_tag'
+                }],
+                [/[^\/*@]+/, 'comment.doc'],
+                [/\*\//, 'comment.doc', '@pop'],
+                [/[\/*]/, 'comment.doc']
+            ],
+            
+            jsdoc_tag: [
+                [/@\w+/, 'comment.doc.tag'],
+                [/\s+/, ''],
+                [/\{[^}]*\}/, 'comment.doc.type'],
+                [/./, { token: '@rematch', next: '@pop' }]
+            ],
+            
+            regexp: [
+                [/(\{)(\d+(?:,\d*)?)(\})/, ['regexp.escape.control', 'regexp.escape.control', 'regexp.escape.control']],
+                [/(\[)(\^?)(?=(?:[^\]\\\/]|\\.)+)/, ['regexp.escape.control', { token: 'regexp.escape.control', next: '@regexrange' }]],
+                [/(\()(\?:|\?=|\?!)/, ['regexp.escape.control', 'regexp.escape.control']],
+                [/[()]/, 'regexp.escape.control'],
+                [/@regexpctl/, 'regexp.escape.control'],
+                [/[^\\\/]/, 'regexp'],
+                [/@regexpesc/, 'regexp.escape'],
+                [/\\\./, 'regexp.invalid'],
+                [/(\/)([gimsuy]*)/, [{ token: 'regexp', bracket: '@close', next: '@pop' }, 'keyword.other']],
+            ],
+            
+            regexrange: [
+                [/-/, 'regexp.escape.control'],
+                [/\^/, 'regexp.invalid'],
+                [/@regexpesc/, 'regexp.escape'],
+                [/[^\]]/, 'regexp'],
+                [/\]/, { token: 'regexp.escape.control', next: '@pop', bracket: '@close' }],
+            ],
+            
+            string_double: [
+                [/[^\\"]+/, 'string'],
+                [/@escapes/, 'string.escape'],
+                [/\\./, 'string.escape.invalid'],
+                [/"/, 'string', '@pop']
+            ],
+            
+            string_single: [
+                [/[^\\']+/, 'string'],
+                [/@escapes/, 'string.escape'],
+                [/\\./, 'string.escape.invalid'],
+                [/'/, 'string', '@pop']
+            ],
+            
+            string_backtick: [
+                [/\$\{/, { token: 'delimiter.bracket', next: '@bracketCounting' }],
+                [/[^\\`$]+/, 'string'],
+                [/@escapes/, 'string.escape'],
+                [/\\./, 'string.escape.invalid'],
+                [/`/, 'string', '@pop']
+            ],
+            
+            bracketCounting: [
+                [/\{/, 'delimiter.bracket', '@bracketCounting'],
+                [/\}/, 'delimiter.bracket', '@pop'],
+                { include: 'common' }
+            ],
+        },
+    });
+    monaco.languages.setMonarchTokensProvider('typescript', {
+        defaultToken: 'invalid',
+        tokenPostfix: '.ts',
+        
+        // Control flow keywords (purple)
+        controlKeywords: [
+            'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'default',
+            'break', 'continue', 'return', 'throw', 'try', 'catch', 'finally',
+            'import', 'export', 'from', 'as'
+        ],
+        
+        // Declaration keywords (blue)
+        declarationKeywords: [
+            'function', 'const', 'let', 'var', 'class', 'extends', 'new',
+            'this', 'super', 'static', 'async', 'await', 'yield', 'typeof',
+            'instanceof', 'in', 'of', 'void', 'delete', 'debugger'
+        ],
+        
+        // Other keywords
+        otherKeywords: [
+            'true', 'false', 'null', 'undefined', 'with', 'enum'
+        ],
+        
+        operators: [
+            '<=', '>=', '==', '!=', '===', '!==', '=>', '+', '-', '**',
+            '*', '/', '%', '++', '--', '<<', '</', '>>', '>>>', '&',
+            '|', '^', '!', '~', '&&', '||', '?', ':', '=', '+=', '-=',
+            '*=', '/=', '%=', '<<=', '>>=', '>>>=', '&=', '|=', '^=',
+            '@', '...', '??', '?.', '??='
+        ],
+        
+        symbols: /[=><!~?:&|+\-*\/\^%]+/,
+        
+        escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+        
+        digits: /\d+(_+\d+)*/,
+        
+        octaldigits: /[0-7]+(_+[0-7]+)*/,
+        
+        binarydigits: /[0-1]+(_+[0-1]+)*/,
+        
+        hexdigits: /[0-9a-fA-F]+(_+[0-9a-fA-F]+)*/,
+        
+        regexpctl: /[(){}\[\]\$\^|\-*+?\.]/,
+        
+        regexpesc: /\\(?:[bBdDfnrstvwWn0\\\/]|@regexpctl|c[A-Z]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4})/,
+        
+        tokenizer: {
+            root: [
+                [/[{}]/, 'delimiter.bracket'],
+                { include: 'common' }
+            ],
+            
+            common: [
+                // Method calls: identifier.methodName(
+                [/([a-z_$][\w$]*)(\.)([a-z_$][\w$]*)(\s*)(\()/, ['identifier', 'delimiter', 'entity.name.method', '', 'delimiter.parenthesis']],
+                
+                // Function calls: functionName(
+                [/([a-z_$][\w$]*)(\s*)(\()/, {
+                    cases: {
+                        '$1@controlKeywords': ['keyword.control', '', 'delimiter.parenthesis'],
+                        '$1@declarationKeywords': ['keyword.declaration', '', 'delimiter.parenthesis'],
+                        '$1@otherKeywords': ['keyword.other', '', 'delimiter.parenthesis'],
+                        '@default': ['entity.name.function', '', 'delimiter.parenthesis']
+                    }
+                }],
+
+                // Parameter types: param: type (type is green)
+                // This rule matches identifiers followed by a colon and a type identifier
+                [/([a-zA-Z_$][\w$]*)(\s*)(:)(\s*)([a-zA-Z_$][\w$]*)/, [
+                    'variable.parameter', '', 'delimiter', '', 'type'
+                ]],
                 
                 // identifiers and keywords
                 [/[a-z_$][\w$]*/, {
@@ -777,10 +959,46 @@ function tokenizeLine(line, lineIndex) {
 }
 
 // Initialize Monaco Editor in a container
-async function initializeMonacoEditor(container, initialValue = '', readOnly = false) {
+async function initializeMonacoEditor(container, initialValue = '', readOnly = false, language = 'javascript') {
     try {
         // Ensure Monaco is loaded
         await loadMonacoEditor();
+
+        if (language === 'javascript') {
+            // Fetch runtime module
+            fetch('https://anton2026gamca.github.io/RoboticChess/src/App/chess.js')
+                .then(res => res.text())
+                .then(code => {
+                    // Wrap it inside a 'declare module' with exports inferred
+                    const wrapped = `
+                        declare module 'https://anton2026gamca.github.io/RoboticChess/src/App/chess.js' {
+                            ${code}
+                        }
+                    `;
+
+                    // Inject into Monaco as virtual declaration
+                    monaco.languages.typescript.javascriptDefaults.addExtraLib(
+                        wrapped,
+                        'file:///node_modules/@types/chess-url/index.d.ts'
+                    );
+                })
+                .catch(err => console.error('[Monaco] chess.js fetch error:', err));
+        } else if (language === 'typescript') {
+            // Load local chess.d.ts for type definitions, but allow import from the remote URL
+            fetch('./chess.d.ts')
+                .then(res => res.text())
+                .then(dts => {
+                    // Register the type definitions for the remote module URL
+                    const wrapped = `
+                        ${dts}
+                    `;
+                    monaco.languages.typescript.typescriptDefaults.addExtraLib(
+                        wrapped,
+                        'file:///node_modules/@types/chess-url/index.d.ts'
+                    );
+                })
+                .catch(err => console.error('[Monaco] chess.d.ts fetch error:', err));
+        }
         
         // Dispose existing editor if any
         if (monacoEditor) {
@@ -806,7 +1024,8 @@ async function initializeMonacoEditor(container, initialValue = '', readOnly = f
         const editorConfig = {
             ...MONACO_CONFIG,
             value: initialValue,
-            readOnly: readOnly
+            readOnly: readOnly,
+            language: language
         };
 
         // Create Monaco editor

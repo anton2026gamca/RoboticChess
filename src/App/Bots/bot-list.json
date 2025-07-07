@@ -4,6 +4,10 @@
         "url": "./Bots/dummy-bot.js"
     },
     {
+        "name": "Dummy Bot",
+        "url": "./Bots/dummy-bot.ts"
+    },
+    {
         "name": "Minimax Bot",
         "url": "./Bots/minimax-bot.js"
     },
