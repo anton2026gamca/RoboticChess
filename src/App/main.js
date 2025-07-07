@@ -23,9 +23,9 @@ const PIECE_IMAGES = {
 // Default bot code template for creating new custom bots
 const DEFAULT_BOT_CODE = `import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
 
-/*
+/**
  * This function is called when it's the bot's turn
- * @param {string} fen - The FEN string representing the current board state
+ * @param {string} fen The FEN string representing the current board state
  * @returns {Chess.Move} The move to play
  */
 export function think(fen) {
@@ -198,7 +198,7 @@ function handleOverlayKeydown(event) {
         event.preventDefault();
         
         // Find the visible overlay and close it
-        const overlays = ['new-game-overlay', 'game-finished-overlay', 'code-editor-overlay'];
+        const overlays = ['new-game-overlay', 'game-finished-overlay'];
         for (const overlayId of overlays) {
             const overlay = document.getElementById(overlayId);
             if (overlay && overlay.style.display !== 'none') {
@@ -628,6 +628,37 @@ function deleteBot(botName) {
     refreshBotsList();
 }
 
+async function saveBot() {
+    const overlay = document.getElementById('code-editor-overlay');
+    const titleElement = document.getElementById('code-editor-title');
+    
+    // Remove overlay active state and restore focus
+    document.body.classList.remove('modal-overlay-active');
+    
+    overlay.style.display = 'none';
+    
+    // Get code from Monaco Editor
+    const code = window.getEditorValue ? window.getEditorValue() : '';
+    const title = titleElement.value.trim();
+
+    const bot = addBot(title, '', code);
+
+    // Update active bots if they match
+    if (whiteBotInstance?.name && title === whiteBotInstance.name) {
+        window.white_bot_code = code;
+        await setupBot(bot, true);
+    }
+    if (blackBotInstance?.name && title === blackBotInstance.name) {
+        window.black_bot_code = code;
+        await setupBot(bot, false);
+    }
+    
+    // Dispose Monaco Editor after saving
+    if (window.closeEditor) {
+        window.closeEditor();
+    }
+}
+
 async function refreshBotsList() {
     const botListContainer = document.getElementById('bot-list-container');
     const whiteBotTypeSelect = document.getElementById('white-bot-type');
@@ -690,125 +721,33 @@ async function refreshBotsList() {
 // CODE EDITOR FUNCTIONS
 // ============================================================================
 
+/**
+ * Opens the code editor with bot name and code
+ * @param {string} botName - The name of the bot
+ * @param {string} botCode - The bot's JavaScript code
+ * @param {boolean} readOnly - Whether the editor should be read-only
+ */
 function openCodeEditor(botName, botCode, readOnly = false) {
-    const overlay = document.getElementById('code-editor-overlay');
-    const codeElement = document.getElementById('code-editor');
     const titleElement = document.getElementById('code-editor-title');
-    const saveButton = document.getElementById('code-editor-save');
     
-    // Store currently focused element
-    window.lastFocusedElement = document.activeElement;
-    
-    // Add overlay active state
-    document.body.classList.add('modal-overlay-active');
-    
-    overlay.style.display = 'flex';
-    codeElement.textContent = botCode;
-    titleElement.value = botName;
-    
-    // Configure read-only mode
-    if (readOnly) {
-        titleElement.disabled = false; // Keep enabled for selection
-        titleElement.readOnly = true; // Make it read-only instead of disabled
-        titleElement.style.cursor = 'text';
+    // Set the bot name in the title input
+    if (titleElement) {
+        titleElement.value = botName;
         
-        codeElement.contentEditable = 'true'; // Keep editable for selection
-        codeElement.style.cursor = 'text';
-        
-        // Store handlers for cleanup
-        const keydownHandler = (e) => {
-            // Allow selection shortcuts but prevent editing
-            if (e.ctrlKey && (e.key === 'a' || e.key === 'c')) {
-                return; // Allow Ctrl+A (select all) and Ctrl+C (copy)
-            }
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || 
-                e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
-                e.key === 'Home' || e.key === 'End' ||
-                e.key === 'PageUp' || e.key === 'PageDown') {
-                return; // Allow navigation
-            }
-            e.preventDefault(); // Prevent all other key inputs
-        };
-        
-        const pasteHandler = (e) => {
-            e.preventDefault(); // Prevent pasting
-        };
-        
-        const inputHandler = (e) => {
-            e.preventDefault(); // Prevent input
-        };
-        
-        codeElement.readOnlyKeyHandler = keydownHandler;
-        codeElement.readOnlyPasteHandler = pasteHandler;
-        codeElement.readOnlyInputHandler = inputHandler;
-        
-        codeElement.addEventListener('keydown', keydownHandler);
-        codeElement.addEventListener('paste', pasteHandler);
-        codeElement.addEventListener('input', inputHandler);
-        
-        if (saveButton) saveButton.style.display = 'none';
-    } else {
-        titleElement.disabled = false;
-        titleElement.readOnly = false;
-        titleElement.style.cursor = '';
-        
-        codeElement.contentEditable = 'true';
-        codeElement.style.cursor = '';
-        
-        // Remove read-only event listeners if they exist
-        if (codeElement.readOnlyKeyHandler) {
-            codeElement.removeEventListener('keydown', codeElement.readOnlyKeyHandler);
-            codeElement.removeEventListener('paste', codeElement.readOnlyPasteHandler);
-            codeElement.removeEventListener('input', codeElement.readOnlyInputHandler);
-            delete codeElement.readOnlyKeyHandler;
-            delete codeElement.readOnlyPasteHandler;
-            delete codeElement.readOnlyInputHandler;
-        }
-        
-        if (saveButton) saveButton.style.display = 'inline-block';
-    }
-    
-    // Apply syntax highlighting if Prism is available
-    if (typeof Prism !== 'undefined') {
-        Prism.highlightElement(codeElement);
-    }
-    
-    // Focus the appropriate element
-    setTimeout(() => {
+        // Configure title element based on read-only mode
         if (readOnly) {
-            const cancelButton = document.getElementById('code-editor-cancel');
-            if (cancelButton) {
-                cancelButton.focus();
-            }
+            titleElement.disabled = false;
+            titleElement.readOnly = true;
+            titleElement.style.cursor = 'text';
         } else {
-            titleElement.focus();
+            titleElement.disabled = false;
+            titleElement.readOnly = false;
+            titleElement.style.cursor = '';
         }
-    }, 0);
-}
-
-async function saveCode() {
-    const overlay = document.getElementById('code-editor-overlay');
-    const codeElement = document.getElementById('code-editor');
-    const titleElement = document.getElementById('code-editor-title');
-    
-    // Remove overlay active state and restore focus
-    document.body.classList.remove('modal-overlay-active');
-    
-    overlay.style.display = 'none';
-    
-    const code = codeElement.textContent;
-    const title = titleElement.value.trim();
-
-    const bot = addBot(title, '', code);
-
-    // Update active bots if they match
-    if (whiteBotInstance?.name && title === whiteBotInstance.name) {
-        window.white_bot_code = code;
-        await setupBot(bot, true);
     }
-    if (blackBotInstance?.name && title === blackBotInstance.name) {
-        window.black_bot_code = code;
-        await setupBot(bot, false);
+    
+    if (window.openEditor) {
+        window.openEditor(botCode, readOnly);
     }
 }
 
@@ -853,8 +792,8 @@ function pieceToNotation(piece) {
 function convertMoveToAlgebraic(move, boardState, allMoves) {
     const fromSquare = move.from;
     const toSquare = move.to;
-    const piece = boardState.GetPiece(fromSquare);
-    const capturedPiece = boardState.GetPiece(toSquare);
+    const piece = boardState.getPiece(fromSquare);
+    const capturedPiece = boardState.getPiece(toSquare);
     const pieceNotation = pieceToNotation(piece);
     
     // Check for castling
@@ -868,7 +807,7 @@ function convertMoveToAlgebraic(move, boardState, allMoves) {
     // For non-pawn moves, check if disambiguation is needed
     if (pieceNotation !== '') {
         const samePieceMoves = allMoves.filter(m => {
-            const otherPiece = boardState.GetPiece(m.from);
+            const otherPiece = boardState.getPiece(m.from);
             return m.to === toSquare && 
                    m.from !== fromSquare && 
                    pieceToNotation(otherPiece) === pieceNotation;
@@ -907,17 +846,17 @@ function convertMoveToAlgebraic(move, boardState, allMoves) {
     notation += toSquare.toLowerCase();
     
     // Simulate the move to check for check/checkmate
-    const tempBoard = new Chess.Board(boardState.GetFEN());
-    tempBoard.MakeMove(move);
+    const tempBoard = new Chess.Board(boardState.getFEN());
+    tempBoard.makeMove(move);
     
-    const gameOverState = tempBoard.IsGameOver();
+    const gameOverState = tempBoard.isGameOver();
     if (gameOverState.over) {
         if (gameOverState.reason === 'checkmate') {
             notation += '#';
         }
     } else {
         // Check if the move puts the opponent in check
-        const opponentKingInCheck = tempBoard.IsKingAttacked(tempBoard.whiteToPlay);
+        const opponentKingInCheck = tempBoard.isKingAttacked(tempBoard.whiteToPlay);
         if (opponentKingInCheck) {
             notation += '+';
         }
@@ -931,7 +870,7 @@ function addMoveToHistory(move, notation, isWhite) {
         move: move,
         notation: notation,
         isWhite: isWhite,
-        fen: board.GetFEN()
+        fen: board.getFEN()
     };
     
     // If we're at the end of history or this is a new move, add it
@@ -1023,7 +962,7 @@ function navigateToMove(moveIndex) {
     // Replay moves up to the selected move
     for (let i = 0; i <= moveIndex; i++) {
         const moveData = moveHistory[i];
-        board.MakeMove(moveData.move);
+        board.makeMove(moveData.move);
     }
     
     syncBoard();
@@ -1033,7 +972,7 @@ function navigateToMove(moveIndex) {
     
     // Always ensure the correct timer is running during an active game
     if (playingGame) {
-        const gameOverState = board.IsGameOver();
+        const gameOverState = board.isGameOver();
         if (!gameOverState.over) {
             const startTime = Date.now();
             startTimer(board.whiteToPlay, startTime);
@@ -1053,7 +992,7 @@ function updateGameStatus() {
         return;
     }
     
-    const gameOverState = board.IsGameOver();
+    const gameOverState = board.isGameOver();
     if (gameOverState.over) {
         if (gameOverState.reason === 'checkmate') {
             statusElement.textContent = `Checkmate! ${gameOverState.winner} wins`;
@@ -1064,7 +1003,7 @@ function updateGameStatus() {
         }
     } else {
         const currentPlayer = board.whiteToPlay ? 'White' : 'Black';
-        const inCheck = board.IsKingAttacked(board.whiteToPlay);
+        const inCheck = board.isKingAttacked(board.whiteToPlay);
         statusElement.textContent = inCheck ? `${currentPlayer} to move (in check)` : `${currentPlayer} to move`;
     }
 }
@@ -1090,7 +1029,7 @@ function redoMove() {
     
     if (nextMove) {
         // Make the move on the board
-        const result = board.MakeMove(nextMove.move);
+        const result = board.makeMove(nextMove.move);
         
         if (result?.reason !== 'illegal move') {
             // Update the current move index
@@ -1101,7 +1040,7 @@ function redoMove() {
                 syncBoard();
             } else {
                 clearSquare(nextMove.move.from);
-                const piece = board.GetPiece(nextMove.move.to);
+                const piece = board.getPiece(nextMove.move.to);
                 updatePieceOnSquare(nextMove.move.to, piece);
             }
             
@@ -1111,7 +1050,7 @@ function redoMove() {
             
             // Always ensure the correct timer is running during an active game
             if (playingGame) {
-                const gameOverState = board.IsGameOver();
+                const gameOverState = board.isGameOver();
                 if (!gameOverState.over) {
                     const startTime = Date.now();
                     startTimer(board.whiteToPlay, startTime);
@@ -1143,11 +1082,11 @@ function makeMove(move) {
     }
     
     // Get algebraic notation before making the move
-    const allMoves = board.GetMoves();
+    const allMoves = board.getMoves();
     const isWhiteMove = board.whiteToPlay;
     const algebraicNotation = convertMoveToAlgebraic(move, board, allMoves);
     
-    const result = board.MakeMove(move);
+    const result = board.makeMove(move);
     
     // Handle illegal move
     if (result?.reason === 'illegal move') {
@@ -1159,7 +1098,7 @@ function makeMove(move) {
 
     // Update visual board
     clearSquare(move.from);
-    const piece = board.GetPiece(move.to);
+    const piece = board.getPiece(move.to);
     updatePieceOnSquare(move.to, piece);
 
     // Special moves may require full board sync
@@ -1240,8 +1179,8 @@ async function getUserInput() {
             if (!target) return;
 
             const square = target.id;
-            const piece = board.GetPiece(square);
-            const allMoves = board.GetMoves();
+            const piece = board.getPiece(square);
+            const allMoves = board.getMoves();
             dragState.validMoves = allMoves.filter(move => move.from === square);
 
             // Highlight valid move destinations
@@ -1370,7 +1309,7 @@ async function getBotInput() {
         }
 
         // Send thinking request to bot
-        const boardFEN = board.GetFEN();
+        const boardFEN = board.getFEN();
         botIframe.contentWindow.postMessage({ type: 'think', value: boardFEN }, "*");
 
         // Poll for bot response
@@ -1685,10 +1624,8 @@ function setupEventListeners() {
     const redoBtn = document.getElementById('redo-move-btn');
     const newBotBtn = document.getElementById('new-bot-btn');
     const startGameBtn = document.getElementById('start-game-btn');
-
-    // Code editor buttons
-    const codeEditorCancel = document.getElementById('code-editor-cancel');
     const codeEditorSave = document.getElementById('code-editor-save');
+    const codeEditorCancel = document.getElementById('code-editor-cancel');
 
     // Add event listeners
     if (openMenuBtn) openMenuBtn.addEventListener('click', openMenu);
@@ -1698,8 +1635,24 @@ function setupEventListeners() {
     if (redoBtn) redoBtn.addEventListener('click', redoMoveBtnPressed);
     if (newBotBtn) newBotBtn.addEventListener('click', () => openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE));
     if (startGameBtn) startGameBtn.addEventListener('click', startGameBtnPressed);
-    if (codeEditorCancel) codeEditorCancel.addEventListener('click', () => closeOverlay('code-editor-overlay'));
-    if (codeEditorSave) codeEditorSave.addEventListener('click', saveCode);
+    if (codeEditorSave) codeEditorSave.addEventListener('click', saveBot);
+    if (codeEditorCancel) {
+        codeEditorCancel.addEventListener('click', () => {
+            if (window.closeEditor) {
+                window.closeEditor();
+            } else {
+                const overlay = document.getElementById('code-editor-overlay');
+                overlay.style.display = 'none';
+                document.body.classList.remove('modal-overlay-active');
+                
+                // Restore focus to the previously focused element
+                if (window.lastFocusedElement) {
+                    window.lastFocusedElement.focus();
+                    window.lastFocusedElement = null;
+                }
+            }
+        });
+    }
 
     // Focus trap for overlays
     document.addEventListener('keydown', handleOverlayKeydown);
@@ -1859,7 +1812,7 @@ function showPromotionOverlay() {
         
         // Determine which color pieces to show
         const isWhite = board.whiteToPlay;
-        const promotionPieces = Chess.GetPromotionPieces(isWhite);
+        const promotionPieces = Chess.getPromotionPieces(isWhite);
         
         // Update button icons to show correct color pieces
         buttons.forEach((button, index) => {
@@ -1870,7 +1823,7 @@ function showPromotionOverlay() {
             const pieceImage = getPieceImage(piece);
             if (pieceImage) {
                 icon.innerHTML = `<img src="${pieceImage}" style="width: 40px; height: 40px;" draggable="false" 
-                    alt="${Chess.GetPieceName(piece)}" 
+                    alt="${Chess.getPieceName(piece)}" 
                     onerror="this.style.display='none'; this.parentElement.style.fontSize='36px'; this.parentElement.innerHTML='${getUnicodeForPiece(piece)}';">`;
             } else {
                 // Fallback to unicode symbols
@@ -2002,7 +1955,7 @@ window.startGameBtnPressed = startGameBtnPressed;
 window.undoMoveBtnPressed = undoMoveBtnPressed;
 window.redoMoveBtnPressed = redoMoveBtnPressed;
 window.openCodeEditor = openCodeEditor;
-window.saveCode = saveCode;
+window.saveBot = saveBot;
 window.editBot = editBot;
 window.viewBot = viewBot;
 window.deleteBot = deleteBot;
@@ -2034,6 +1987,8 @@ async function initializeApp() {
     // Load bots
     await loadBots();
     refreshBotsList();
+
+    await initializeMonaco(document.getElementById('code-editor'));
 }
 
 /**

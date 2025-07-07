@@ -1,6 +1,6 @@
 import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
 
-/**
+/*
  * Advanced Strategic Chess Bot
  * 
  * This bot implements sophisticated chess strategy including:
@@ -104,7 +104,7 @@ const KING_TABLE = [
  */
 export function think(fen) {
     const board = new Chess.Board(fen);
-    const moves = board.GetMoves();
+    const moves = board.getMoves();
     
     if (moves.length === 0) {
         return null; // No legal moves
@@ -125,11 +125,11 @@ export function think(fen) {
  * Minimax algorithm with alpha-beta pruning
  */
 function minimax(board, depth, alpha, beta, maximizingPlayer) {
-    if (depth === 0 || board.IsGameOver().over) {
+    if (depth === 0 || board.isGameOver().over) {
         return { score: evaluatePosition(board), move: null };
     }
     
-    const moves = board.GetMoves();
+    const moves = board.getMoves();
     let bestMove = null;
     
     if (maximizingPlayer) {
@@ -137,13 +137,13 @@ function minimax(board, depth, alpha, beta, maximizingPlayer) {
         
         for (const move of moves) {
             // Make the move
-            board.MakeMove(move, false);
+            board.makeMove(move, false);
             
             // Recursively evaluate
             const eval_result = minimax(board, depth - 1, alpha, beta, false);
             
             // Undo the move
-            board.UndoMove();
+            board.undoMove();
             
             if (eval_result.score > maxEval) {
                 maxEval = eval_result.score;
@@ -162,13 +162,13 @@ function minimax(board, depth, alpha, beta, maximizingPlayer) {
         
         for (const move of moves) {
             // Make the move
-            board.MakeMove(move, false);
+            board.makeMove(move, false);
             
             // Recursively evaluate
             const eval_result = minimax(board, depth - 1, alpha, beta, true);
             
             // Undo the move
-            board.UndoMove();
+            board.undoMove();
             
             if (eval_result.score < minEval) {
                 minEval = eval_result.score;
@@ -189,7 +189,7 @@ function minimax(board, depth, alpha, beta, maximizingPlayer) {
  * Evaluate the current position
  */
 function evaluatePosition(board) {
-    const gameOver = board.IsGameOver();
+    const gameOver = board.isGameOver();
     
     // Handle game over positions
     if (gameOver.over) {
@@ -293,10 +293,10 @@ function evaluateKingSafety(board) {
     let score = 0;
     
     // Penalize if king is in check
-    if (board.IsKingAttacked(true)) {
+    if (board.isKingAttacked(true)) {
         score -= 50;
     }
-    if (board.IsKingAttacked(false)) {
+    if (board.isKingAttacked(false)) {
         score += 50;
     }
     
@@ -331,12 +331,12 @@ function evaluateCenterControl(board) {
 function evaluateMobility(board) {
     // Count legal moves as a simple mobility measure
     const currentPlayer = board.whiteToPlay;
-    const moves = board.GetMoves();
+    const moves = board.getMoves();
     const mobilityScore = moves.length;
     
     // Switch turns to count opponent mobility
     board.whiteToPlay = !board.whiteToPlay;
-    const opponentMoves = board.GetMoves();
+    const opponentMoves = board.getMoves();
     const opponentMobilityScore = opponentMoves.length;
     board.whiteToPlay = currentPlayer; // Restore turn
     

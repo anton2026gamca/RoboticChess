@@ -1,6 +1,6 @@
 import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
 
-/**
+/*
  * Minimax Chess Bot
  * 
  * This bot implements the classic minimax algorithm for chess move selection.
@@ -33,7 +33,7 @@ const PIECE_VALUES = {
  */ 
 export function think(fen) {
     const board = new Chess.Board(fen);
-    const moves = board.GetMoves();
+    const moves = board.getMoves();
     
     if (moves.length === 0) {
         return null; // No legal moves
@@ -60,11 +60,11 @@ export function think(fen) {
  * @returns {Object} Object containing the best score and corresponding move
  */
 function minimax(board, depth) {
-    if (depth === 0 || board.IsGameOver().over) {
+    if (depth === 0 || board.isGameOver().over) {
         return { score: evaluatePosition(board), move: null };
     }
 
-    const moves = board.GetMoves();
+    const moves = board.getMoves();
     let bestMove = null;
     
     // Maximizing player (White's turn)
@@ -76,9 +76,9 @@ function minimax(board, depth) {
             const move = moves[i];
             
             // Make the move and recursively search the resulting position
-            board.MakeMove(move, false);
+            board.makeMove(move, false);
             const eval_result = minimax(board, depth - 1);
-            board.UndoMove(); // Restore board state
+            board.undoMove(); // Restore board state
 
             // If this move leads to a better score, remember it
             if (eval_result.score > maxEval) {
@@ -97,9 +97,9 @@ function minimax(board, depth) {
             const move = moves[i];
             
             // Make the move and recursively search the resulting position
-            board.MakeMove(move, false);
+            board.makeMove(move, false);
             const eval_result = minimax(board, depth - 1);
-            board.UndoMove(); // Restore board state
+            board.undoMove(); // Restore board state
 
             // If this move leads to a better score for black (lower number), remember it
             if (eval_result.score < minEval) {
@@ -118,7 +118,7 @@ function minimax(board, depth) {
  * @returns {number} A score representing the position's favorability for White
  */
 function evaluatePosition(board) {
-    const gameOver = board.IsGameOver();
+    const gameOver = board.isGameOver();
     
     // Handle game over positions
     if (gameOver.over) {
@@ -165,10 +165,10 @@ function evaluateKingSafety(board) {
     let score = 0;
     
     // Penalize if king is in check
-    if (board.IsKingAttacked(true)) {
+    if (board.isKingAttacked(true)) {
         score -= 50;
     }
-    if (board.IsKingAttacked(false)) {
+    if (board.isKingAttacked(false)) {
         score += 50;
     }
     

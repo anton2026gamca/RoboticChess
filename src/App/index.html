@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="w3.css">
     <link rel="stylesheet" href="main.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 </head>
 <body class="app-body">
     <!-- Header -->
@@ -205,9 +204,8 @@
                     <i class="fa fa-save"></i><span class="editor-toolbar-button-label"> Save</span>
                 </button>
             </div>
-            <pre class="code-editor-panel" style="padding-top: 0px; padding-bottom: 0px;">
-                <code id="code-editor" class="language-javascript code-editor-content" contenteditable="true" spellcheck="false"></code>
-            </pre>
+            <!-- Monaco Editor -->
+            <div id="code-editor" class="code-editor-panel"></div>
         </div>
     </div>
 
@@ -247,8 +245,6 @@
     <iframe id="black-bot-iframe" sandbox="allow-scripts" style="display: none;" title="Black Bot Communication"></iframe>
     
     <!-- External Scripts -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="code-editor.js"></script>
     
     <!-- Main Application Script -->

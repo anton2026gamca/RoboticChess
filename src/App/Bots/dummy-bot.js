@@ -1,7 +1,7 @@
 import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
 
-/**
- * Random Chess Bot
+/*
+ * Dummy Bot
  * 
  * This bot plays completely randomly, selecting moves at random from all legal moves.
  * It provides unpredictable gameplay and serves as a baseline for comparing other bots.
@@ -11,7 +11,7 @@ import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.j
 
 export function think(fen) {
     const board = new Chess.Board(fen);
-    const moves = board.GetMoves();
+    const moves = board.getMoves();
     
     if (moves.length === 0) {
         return null; // No legal moves

@@ -1,6 +1,6 @@
 import Chess from "https://anton2026gamca.github.io/RoboticChess/src/App/chess.js";
 
-/**
+/*
  * Negamax Alpha-Beta Chess Bot
  * 
  * This bot implements the negamax algorithm with alpha-beta pruning optimization.
@@ -112,7 +112,7 @@ const KING_END_GAME_TABLE = [
  */ 
 export function think(fen) {
     const board = new Chess.Board(fen);
-    const moves = board.GetMoves();
+    const moves = board.getMoves();
     
     if (moves.length === 0) {
         return null; // No legal moves (should not happen in a valid game)
@@ -143,28 +143,28 @@ export function think(fen) {
  * @returns {Object} An object containing the best score and corresponding move
  */
 function negamaxAlphaBeta(board, depth, alpha, beta) {
-    if (depth === 0 || board.IsGameOver().over) {
+    if (depth === 0 || board.isGameOver().over) {
         // Evaluate from the current player's perspective
         const evaluation = evaluatePosition(board);
         const score = board.whiteToPlay ? evaluation : -evaluation;
         return { score: score, move: null };
     }
     
-    const moves = board.GetMoves();
+    const moves = board.getMoves();
     let bestMove = null;
     let maxEval = -Infinity;
     
     // Try each possible move to find the one that gives the best score
     for (const move of moves) {
         // Make the move on the board to explore this branch
-        board.MakeMove(move, false);
+        board.makeMove(move, false);
         
         // Recursively search deeper, negating the score for the opponent
         const eval_result = negamaxAlphaBeta(board, depth - 1, -beta, -alpha);
         const score = -eval_result.score;
         
         // Undo the move to restore the board state for the next iteration
-        board.UndoMove();
+        board.undoMove();
 
         // Update the best move if this one gives a better score
         if (score > maxEval) {
@@ -190,7 +190,7 @@ function negamaxAlphaBeta(board, depth, alpha, beta) {
  * @returns {number} A score representing the position's favorability for white.
  */
 function evaluatePosition(board) {
-    const gameOver = board.IsGameOver();
+    const gameOver = board.isGameOver();
     
     // Handle game over positions
     if (gameOver.over) {
@@ -316,10 +316,10 @@ function evaluateKingSafety(board) {
     let score = 0;
     
     // Penalize if king is in check
-    if (board.IsKingAttacked(true)) {
+    if (board.isKingAttacked(true)) {
         score -= 50;
     }
-    if (board.IsKingAttacked(false)) {
+    if (board.isKingAttacked(false)) {
         score += 50;
     }
     

@@ -8,19 +8,32 @@ export default class Chess {
      * Uses numeric values for efficient storage and comparison
      */
     static Piece = class {
-        static NONE = 0;          // Empty square
-        static WHITE_PAWN = 1;    // White pawn
-        static WHITE_ROOK = 2;    // White rook
-        static WHITE_KNIGHT = 3;  // White knight
-        static WHITE_BISHOP = 4;  // White bishop
-        static WHITE_QUEEN = 5;   // White queen
-        static WHITE_KING = 6;    // White king
-        static BLACK_PAWN = 7;    // Black pawn
-        static BLACK_ROOK = 8;    // Black rook
-        static BLACK_KNIGHT = 9;  // Black knight
-        static BLACK_BISHOP = 10; // Black bishop
-        static BLACK_QUEEN = 11;  // Black queen
-        static BLACK_KING = 12;   // Black king
+        /** Empty square */
+        static NONE = 0;          
+        /** White pawn */
+        static WHITE_PAWN = 1;    
+        /** White rook */
+        static WHITE_ROOK = 2;    
+        /** White knight */
+        static WHITE_KNIGHT = 3;  
+        /** White bishop */
+        static WHITE_BISHOP = 4;  
+        /** White queen */
+        static WHITE_QUEEN = 5;   
+        /** White king */
+        static WHITE_KING = 6;    
+        /** Black pawn */
+        static BLACK_PAWN = 7;    
+        /** Black rook */
+        static BLACK_ROOK = 8;    
+        /** Black knight */
+        static BLACK_KNIGHT = 9;  
+        /** Black bishop */
+        static BLACK_BISHOP = 10; 
+        /** Black queen */
+        static BLACK_QUEEN = 11;  
+        /** Black king */
+        static BLACK_KING = 12;   
     };
 
     /**
@@ -28,20 +41,28 @@ export default class Chess {
      * Uses algebraic notation (e.g., "E2" to "E4")
      */
     static Move = class {
+        /**
+         * Create a new chess move
+         * @param {string} from The starting square (e.g., "E2")
+         * @param {string} to The destination square (e.g., "E4")
+         * @param {number|null} promotion The promotion piece (Chess.Piece.WHITE_QUEEN, etc.) for pawn promotion moves
+         */
         constructor(from, to, promotion = null) {
-            // Store coordinates directly for better performance
-            this.from = from; // Starting square (e.g., "E2")
-            this.to = to;     // Destination square (e.g., "E4")
-            this.promotion = promotion; // Promotion piece (Chess.Piece.WHITE_QUEEN, etc.) for pawn promotion moves
+            /** Starting square (e.g., "E2") */
+            this.from = from; 
+            /** Destination square (e.g., "E4") */
+            this.to = to;     
+            /** Promotion piece (Chess.Piece.WHITE_QUEEN, etc.) for pawn promotion moves */
+            this.promotion = promotion; 
         }
     };
 
     /**
      * Get the display name of a piece for UI purposes
-     * @param {number} piece - The piece type constant
+     * @param {number} piece The piece type constant
      * @returns {string} Human-readable name of the piece
      */
-    static GetPieceName(piece) {
+    static getPieceName(piece) {
         switch (piece) {
             case Chess.Piece.WHITE_PAWN:
             case Chess.Piece.BLACK_PAWN:
@@ -68,10 +89,10 @@ export default class Chess {
 
     /**
      * Get the FEN character representation of a piece
-     * @param {number} piece - The piece type constant
+     * @param {number} piece The piece type constant
      * @returns {string} FEN character for the piece
      */
-    static GetPieceFEN(piece) {
+    static getPieceFEN(piece) {
         switch (piece) {
             case Chess.Piece.WHITE_PAWN: return "P";
             case Chess.Piece.WHITE_ROOK: return "R";
@@ -91,24 +112,35 @@ export default class Chess {
 
     /**
      * Get all available promotion pieces for a given color
-     * @param {boolean} isWhite - True for white pieces, false for black
+     * @param {boolean} isWhite True for white pieces, false for black
      * @returns {Array<number>} Array of piece constants for promotion
      */
-    static GetPromotionPieces(isWhite) {
+    static getPromotionPieces(isWhite) {
         return isWhite ? 
             [Chess.Piece.WHITE_QUEEN, Chess.Piece.WHITE_ROOK, Chess.Piece.WHITE_BISHOP, Chess.Piece.WHITE_KNIGHT] :
             [Chess.Piece.BLACK_QUEEN, Chess.Piece.BLACK_ROOK, Chess.Piece.BLACK_BISHOP, Chess.Piece.BLACK_KNIGHT];
     }
 
-    // Pre-computed coordinate conversion arrays for performance
+    /** Pre-computed coordinate conversion arrays for performance optimization */
     static _files = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    /** Pre-computed rank conversion array for performance optimization */
     static _ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
     
-    // Coordinate conversion helpers
+    /**
+     * Convert board coordinates to algebraic notation
+     * @param {number} r Row index (0-7)
+     * @param {number} c Column index (0-7)
+     * @returns {string} Square in algebraic notation (e.g., "E4")
+     */
     static coordsToSquare(r, c) {
         return Chess._files[c] + Chess._ranks[r];
     }
     
+    /**
+     * Convert algebraic notation to board coordinates
+     * @param {string} square Square in algebraic notation (e.g., "E4")
+     * @returns {Object} Object with r (row) and c (column) properties
+     */
     static squareToCoords(square) {
         return {
             r: 8 - parseInt(square[1]),
@@ -121,41 +153,49 @@ export default class Chess {
      * Manages piece positions, game rules, move validation, and position evaluation
      */
     static Board = class {
-        // Standard starting position in FEN notation
+        /** Standard starting position in FEN notation */
         static DefaultFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
         /**
          * Initialize a new chess board
-         * @param {string} fen - FEN string representing the board position (optional)
+         * @param {string} fen FEN string representing the board position (optional)
          */
         constructor(fen = Chess.Board.DefaultFEN) {
             // Pre-allocate board array more efficiently
+            /** 8x8 board array containing piece constants */
             this.board = new Array(8);
             for (let i = 0; i < 8; i++) {
                 this.board[i] = new Array(8);
             }
             
             // Initialize caches
+            /** Cache for generated moves to avoid recalculation */
             this._movesCache = { fen: null, moves: null };
+            /** Cache for king positions for performance */
             this._kingPositions = { white: null, black: null };
             
-            this.LoadFEN(fen);
+            this.loadFEN(fen);
         }
     
         /**
          * Load a chess position from FEN (Forsyth-Edwards Notation)
          * FEN format: pieces activeColor castling enPassant halfmove fullmove
-         * @param {string} fen - The FEN string to load
+         * @param {string} fen The FEN string to load
+         * @example
+         * // Load starting position
+         * board.loadFEN("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
          */
-        LoadFEN(fen) {
+        loadFEN(fen) {
             // Parse the FEN string into its components
             const parts = fen.split(' ');
             const [piecePlacement, activeColor, castling, enPassant] = parts;
             
             // Set whose turn it is to move
+            /** Boolean indicating if it's white's turn to move */
             this.whiteToPlay = activeColor === 'w';
             
             // Use bitwise operations for castling rights (more efficient)
+            /** Castling rights using bitwise flags: 1=K, 2=Q, 4=k, 8=q */
             this.castlingRights = 0;
             if (castling.includes('K')) this.castlingRights |= 1;  // White king-side
             if (castling.includes('Q')) this.castlingRights |= 2;  // White queen-side  
@@ -163,10 +203,13 @@ export default class Chess {
             if (castling.includes('q')) this.castlingRights |= 8;  // Black queen-side
             
             // Set en passant target square (if any)
+            /** En passant target square in algebraic notation, or null if none */
             this.enPassant = (enPassant === '-') ? null : enPassant;
             
             // Set move counters
+            /** Number of half-moves since last pawn move or capture (for 50-move rule) */
             this.halfmove = parseInt(parts[4]) || 0;
+            /** Current full-move number (increments after black's move) */
             this.fullmove = parseInt(parts[5]) || 1;
     
             // Clear board efficiently
@@ -203,11 +246,15 @@ export default class Chess {
             this._updateKingPositions();
             
             // Initialize position history for threefold repetition tracking
+            /** Array of position hashes for detecting threefold repetition */
             if (!this.positionHistory) this.positionHistory = [];
             this.positionHistory.push(this._getPositionHash());
         }
 
-        // Helper method to update king positions cache
+        /**
+         * Helper method to update king positions cache for performance optimization
+         * @private
+         */
         _updateKingPositions() {
             this._kingPositions.white = null;
             this._kingPositions.black = null;
@@ -228,7 +275,7 @@ export default class Chess {
          * Generate FEN (Forsyth-Edwards Notation) string from current board position
          * @returns {string} Complete FEN string representing the current position
          */
-        GetFEN() {
+        getFEN() {
             // Build piece placement string
             let fen = "";
             for (let r = 0; r < 8; r++) {
@@ -291,10 +338,10 @@ export default class Chess {
     
         /**
          * Place a piece on a specific square
-         * @param {number} piece - The piece type to place
-         * @param {string} square - Square in algebraic notation (e.g., "E4")
+         * @param {number} piece The piece type to place
+         * @param {string} square Square in algebraic notation (e.g., "E4")
          */
-        SetPiece(piece, square) {
+        setPiece(piece, square) {
             if (!square) return;
             const coords = Chess.squareToCoords(square);
             if (coords.r >= 0 && coords.r < 8 && coords.c >= 0 && coords.c < 8) {
@@ -310,10 +357,10 @@ export default class Chess {
     
         /**
          * Get the piece on a specific square
-         * @param {string} square - Square in algebraic notation (e.g., "E4")
+         * @param {string} square Square in algebraic notation (e.g., "E4")
          * @returns {number} The piece type on that square, or NONE if empty/invalid
          */
-        GetPiece(square) {
+        getPiece(square) {
             if (!square) return Chess.Piece.NONE;
             const coords = Chess.squareToCoords(square);
             if (coords.r >= 0 && coords.r < 8 && coords.c >= 0 && coords.c < 8) {
@@ -324,13 +371,17 @@ export default class Chess {
 
         /**
          * Make a move using a Move object
-         * @param {Chess.Move} move - The move to make
-         * @param {boolean} check_legal - Whether to validate move legality (Used for internal reasons)
-         * @returns {object} Result object with status, requireSync, and game over information
+         * @param {Chess.Move} move The move to make
+         * @param {boolean} check_legal Whether to validate move legality (Used for internal reasons)
+         * @returns {Object} Result object containing:
+         *   - {boolean} over - Whether the game is over
+         *   - {string|null} [reason] - Reason for game over
+         *   - {string|null} [winner] - Winner of the game
+         *   - {boolean} requireSync - Whether UI needs to be synchronized for special moves
          */
-        MakeMove(move, check_legal = true) {
+        makeMove(move, check_legal = true) {
             // Check if game is already over
-            const initialGameOverState = this.IsGameOver();
+            const initialGameOverState = this.isGameOver();
             if (initialGameOverState.over) {
                 return { 
                     ...initialGameOverState, 
@@ -340,7 +391,7 @@ export default class Chess {
 
             // Validate move legality if requested
             if (check_legal) {
-                const legalMoves = this.GetMoves();
+                const legalMoves = this.getMoves();
                 const isLegal = legalMoves.some(m => m.from === move.from && m.to === move.to);
                 if (!isLegal) {
                     return { 
@@ -355,8 +406,8 @@ export default class Chess {
             let requireSync = false; // Flag for special moves that need UI sync
 
             // Get pieces involved in the move
-            const fromPiece = this.GetPiece(move.from);
-            const toPiece = this.GetPiece(move.to);
+            const fromPiece = this.getPiece(move.from);
+            const toPiece = this.getPiece(move.to);
 
             // Save current castling rights for move history
             const oldCastlingRights = this.castlingRights;
@@ -369,17 +420,17 @@ export default class Chess {
             if (fromPiece === Chess.Piece.WHITE_KING && move.from === "E1") {
                 if (move.to === "G1" && (this.castlingRights & 1)) {
                     // White king-side castling
-                    this.SetPiece(Chess.Piece.WHITE_KING, "G1");
-                    this.SetPiece(Chess.Piece.NONE, "E1");
-                    this.SetPiece(Chess.Piece.WHITE_ROOK, "F1");
-                    this.SetPiece(Chess.Piece.NONE, "H1");
+                    this.setPiece(Chess.Piece.WHITE_KING, "G1");
+                    this.setPiece(Chess.Piece.NONE, "E1");
+                    this.setPiece(Chess.Piece.WHITE_ROOK, "F1");
+                    this.setPiece(Chess.Piece.NONE, "H1");
                     castlingMove = true;
                 } else if (move.to === "C1" && (this.castlingRights & 2)) {
                     // White queen-side castling
-                    this.SetPiece(Chess.Piece.WHITE_KING, "C1");
-                    this.SetPiece(Chess.Piece.NONE, "E1");
-                    this.SetPiece(Chess.Piece.WHITE_ROOK, "D1");
-                    this.SetPiece(Chess.Piece.NONE, "A1");
+                    this.setPiece(Chess.Piece.WHITE_KING, "C1");
+                    this.setPiece(Chess.Piece.NONE, "E1");
+                    this.setPiece(Chess.Piece.WHITE_ROOK, "D1");
+                    this.setPiece(Chess.Piece.NONE, "A1");
                     castlingMove = true;
                 }
                 // King move removes all castling rights for that side
@@ -387,17 +438,17 @@ export default class Chess {
             } else if (fromPiece === Chess.Piece.BLACK_KING && move.from === "E8") {
                 if (move.to === "G8" && (this.castlingRights & 4)) {
                     // Black king-side castling
-                    this.SetPiece(Chess.Piece.BLACK_KING, "G8");
-                    this.SetPiece(Chess.Piece.NONE, "E8");
-                    this.SetPiece(Chess.Piece.BLACK_ROOK, "F8");
-                    this.SetPiece(Chess.Piece.NONE, "H8");
+                    this.setPiece(Chess.Piece.BLACK_KING, "G8");
+                    this.setPiece(Chess.Piece.NONE, "E8");
+                    this.setPiece(Chess.Piece.BLACK_ROOK, "F8");
+                    this.setPiece(Chess.Piece.NONE, "H8");
                     castlingMove = true;
                 } else if (move.to === "C8" && (this.castlingRights & 8)) {
                     // Black queen-side castling
-                    this.SetPiece(Chess.Piece.BLACK_KING, "C8");
-                    this.SetPiece(Chess.Piece.NONE, "E8");
-                    this.SetPiece(Chess.Piece.BLACK_ROOK, "D8");
-                    this.SetPiece(Chess.Piece.NONE, "A8");
+                    this.setPiece(Chess.Piece.BLACK_KING, "C8");
+                    this.setPiece(Chess.Piece.NONE, "E8");
+                    this.setPiece(Chess.Piece.BLACK_ROOK, "D8");
+                    this.setPiece(Chess.Piece.NONE, "A8");
                     castlingMove = true;
                 }
                 // King move removes all castling rights for that side
@@ -427,7 +478,7 @@ export default class Chess {
                 // Check for en passant capture
                 if (move.to === prevEnPassant && move.from[0] !== move.to[0]) {
                     const capSq = move.to[0] + (parseInt(move.to[1]) - 1);
-                    this.SetPiece(Chess.Piece.NONE, capSq);
+                    this.setPiece(Chess.Piece.NONE, capSq);
                     enPassantCapture = true;
                 }
             }
@@ -439,7 +490,7 @@ export default class Chess {
                 // Check for en passant capture
                 if (move.to === prevEnPassant && move.from[0] !== move.to[0]) {
                     const capSq = move.to[0] + (parseInt(move.to[1]) + 1);
-                    this.SetPiece(Chess.Piece.NONE, capSq);
+                    this.setPiece(Chess.Piece.NONE, capSq);
                     enPassantCapture = true;
                 }
             }
@@ -463,11 +514,11 @@ export default class Chess {
             // Execute the actual piece movement (unless it's castling, already handled)
             if (!castlingMove) {
                 if (promotion) {
-                    this.SetPiece(promotedPiece, move.to);
-                    this.SetPiece(Chess.Piece.NONE, move.from);
+                    this.setPiece(promotedPiece, move.to);
+                    this.setPiece(Chess.Piece.NONE, move.from);
                 } else {
-                    this.SetPiece(fromPiece, move.to);
-                    this.SetPiece(Chess.Piece.NONE, move.from);
+                    this.setPiece(fromPiece, move.to);
+                    this.setPiece(Chess.Piece.NONE, move.from);
                 }
             }
             
@@ -512,7 +563,7 @@ export default class Chess {
             this.positionHistory.push(this._getPositionHash());
             
             // Check if game is over after the move
-            const finalGameOverState = this.IsGameOver();
+            const finalGameOverState = this.isGameOver();
             if (finalGameOverState.over) {
                 return { 
                     ...finalGameOverState, 
@@ -522,7 +573,9 @@ export default class Chess {
             
             // Game continues
             return { 
-                over: false, 
+                over: false,
+                reason: null,
+                winner: null,
                 requireSync: requireSync
             };
         }
@@ -530,40 +583,42 @@ export default class Chess {
         /**
          * Undo the last move made on the board
          * Restores all game state including special moves (castling, en passant, promotion)
+         * @returns {void}
          */
-        UndoMove() {
+        undoMove() {
+            /** Array storing the history of moves for undo functionality */
             if (!this.moveHistory || this.moveHistory.length === 0) return;
             const last = this.moveHistory.pop();
 
             // Restore pieces to their original positions
             if (last.promotion) {
                 // Undo pawn promotion: restore pawn and captured piece
-                this.SetPiece(last.fromPiece, last.move.from);
-                this.SetPiece(last.toPiece, last.move.to);
+                this.setPiece(last.fromPiece, last.move.from);
+                this.setPiece(last.toPiece, last.move.to);
             } else {
                 // Normal move: restore both pieces
-                this.SetPiece(last.fromPiece, last.move.from);
-                this.SetPiece(last.toPiece, last.move.to);
+                this.setPiece(last.fromPiece, last.move.from);
+                this.setPiece(last.toPiece, last.move.to);
             }
 
             // Undo castling: restore rook to original position
             if (last.castlingMove) {
                 if (last.move.from === "E1" && last.move.to === "G1") {
                     // White king-side castling
-                    this.SetPiece(Chess.Piece.WHITE_ROOK, "H1");
-                    this.SetPiece(Chess.Piece.NONE, "F1");
+                    this.setPiece(Chess.Piece.WHITE_ROOK, "H1");
+                    this.setPiece(Chess.Piece.NONE, "F1");
                 } else if (last.move.from === "E1" && last.move.to === "C1") {
                     // White queen-side castling
-                    this.SetPiece(Chess.Piece.WHITE_ROOK, "A1");
-                    this.SetPiece(Chess.Piece.NONE, "D1");
+                    this.setPiece(Chess.Piece.WHITE_ROOK, "A1");
+                    this.setPiece(Chess.Piece.NONE, "D1");
                 } else if (last.move.from === "E8" && last.move.to === "G8") {
                     // Black king-side castling
-                    this.SetPiece(Chess.Piece.BLACK_ROOK, "H8");
-                    this.SetPiece(Chess.Piece.NONE, "F8");
+                    this.setPiece(Chess.Piece.BLACK_ROOK, "H8");
+                    this.setPiece(Chess.Piece.NONE, "F8");
                 } else if (last.move.from === "E8" && last.move.to === "C8") {
                     // Black queen-side castling
-                    this.SetPiece(Chess.Piece.BLACK_ROOK, "A8");
-                    this.SetPiece(Chess.Piece.NONE, "D8");
+                    this.setPiece(Chess.Piece.BLACK_ROOK, "A8");
+                    this.setPiece(Chess.Piece.NONE, "D8");
                 }
             }
 
@@ -571,10 +626,10 @@ export default class Chess {
             if (last.enPassantCapture) {
                 if (last.fromPiece === Chess.Piece.WHITE_PAWN) {
                     const capSq = last.move.to[0] + (parseInt(last.move.to[1]) - 1);
-                    this.SetPiece(Chess.Piece.BLACK_PAWN, capSq);
+                    this.setPiece(Chess.Piece.BLACK_PAWN, capSq);
                 } else if (last.fromPiece === Chess.Piece.BLACK_PAWN) {
                     const capSq = last.move.to[0] + (parseInt(last.move.to[1]) + 1);
-                    this.SetPiece(Chess.Piece.WHITE_PAWN, capSq);
+                    this.setPiece(Chess.Piece.WHITE_PAWN, capSq);
                 }
             }
 
@@ -602,7 +657,7 @@ export default class Chess {
          * Returns true if neither side can possibly deliver checkmate
          * @returns {boolean} True if insufficient material for checkmate
          */
-        IsInsufficientMaterial() {
+        isInsufficientMaterial() {
             let whiteBishops = 0, blackBishops = 0;
             let whiteKnights = 0, blackKnights = 0;
             let whiteOther = 0, blackOther = 0; // Pawns, rooks, queens
@@ -693,28 +748,32 @@ export default class Chess {
 
         /**
          * Check if the game is over due to various end conditions
-         * @returns {object} Game over status with reason and winner
+         * @returns {Object} Game over status object containing:
+         *   - {boolean} over - Whether the game is over
+         *   - {string|null} reason - Reason for game over: "50-move rule", "insufficient material", 
+         *                        "threefold repetition", "checkmate", "stalemate", "illegal move"
+         *   - {string|null} winner - Winner: "white", "black", or "draw"
          */
-        IsGameOver() {
+        isGameOver() {
             // Check 50-move rule (100 half-moves without pawn move or capture)
             if (this.halfmove >= 100) {
                 return { over: true, reason: "50-move rule", winner: "draw" };
             }
             
             // Check for insufficient material to deliver checkmate
-            if (this.IsInsufficientMaterial()) {
+            if (this.isInsufficientMaterial()) {
                 return { over: true, reason: "insufficient material", winner: "draw" };
             }
             
             // Check for threefold repetition of position
-            if (this.IsThreefoldRepetition()) {
+            if (this.isThreefoldRepetition()) {
                 return { over: true, reason: "threefold repetition", winner: "draw" };
             }
             
             // Check for checkmate or stalemate (no legal moves available)
-            const moves = this.GetMoves();
+            const moves = this.getMoves();
             if (moves.length === 0) {
-                if (this.IsKingAttacked(this.whiteToPlay)) {
+                if (this.isKingAttacked(this.whiteToPlay)) {
                     // King is in check with no legal moves = checkmate
                     return { over: true, reason: "checkmate", winner: this.whiteToPlay ? "black" : "white" };
                 } else {
@@ -724,7 +783,7 @@ export default class Chess {
             }
             
             // Game continues
-            return { over: false };
+            return { over: false, reason: null, winner: null };
         }
 
         /**
@@ -732,7 +791,7 @@ export default class Chess {
          * Uses caching and optimized algorithms for better performance
          * @returns {Array<Chess.Move>} Array of all legal moves
          */
-        GetMoves() {
+        getMoves() {
             // Use cache based on position hash to avoid recalculation
             const positionHash = this._getPositionHash();
             if (this._movesCache.hash === positionHash) {
@@ -768,10 +827,11 @@ export default class Chess {
 
         /**
          * Generate moves for a piece at given coordinates
-         * @param {number} r - Row coordinate
-         * @param {number} c - Column coordinate  
-         * @param {number} piece - Piece type
-         * @param {Array} moves - Array to add moves to
+         * @param {number} r Row coordinate (0-7)
+         * @param {number} c Column coordinate (0-7)
+         * @param {number} piece Piece type constant
+         * @param {Array<Chess.Move>} moves Array to add moves to
+         * @private
          */
         _generateMovesForPiece(r, c, piece, moves) {
             const from = Chess.coordsToSquare(r, c);
@@ -807,10 +867,10 @@ export default class Chess {
 
         /**
          * Check if the king of the specified color is currently under attack (optimized)
-         * @param {boolean} isWhite - True to check white king, false for black king
+         * @param {boolean} isWhite True to check white king, false for black king
          * @returns {boolean} True if the king is under attack
          */
-        IsKingAttacked(isWhite = this.whiteToPlay) {
+        isKingAttacked(isWhite = this.whiteToPlay) {
             const kingPos = isWhite ? this._kingPositions.white : this._kingPositions.black;
             if (!kingPos) return false; // Should never happen in a valid position
             
@@ -819,6 +879,9 @@ export default class Chess {
 
         /**
          * Filter pseudo-legal moves to only include legal moves (optimized)
+         * @param {Array<Chess.Move>} moves Array of pseudo-legal moves to filter
+         * @returns {Array<Chess.Move>} Array of legal moves
+         * @private
          */
         _filterLegalMoves(moves) {
             const legalMoves = [];
@@ -835,6 +898,10 @@ export default class Chess {
 
         /**
          * Check if a move is legal (doesn't leave king in check) - optimized version
+         * @param {Chess.Move} move The move to test
+         * @param {Object} kingPos Current king position with r and c properties
+         * @returns {boolean} True if the move is legal
+         * @private
          */
         _isMoveLegal(move, kingPos) {
             const fromCoords = Chess.squareToCoords(move.from);
@@ -864,6 +931,11 @@ export default class Chess {
 
         /**
          * Check if a square is attacked by the opponent (optimized)
+         * @param {number} r Row coordinate (0-7)
+         * @param {number} c Column coordinate (0-7)
+         * @param {boolean} byWhite True if checking for white attacks, false for black
+         * @returns {boolean} True if the square is under attack
+         * @private
          */
         _isSquareAttacked(r, c, byWhite) {
             const attackerStart = byWhite ? Chess.Piece.WHITE_PAWN : Chess.Piece.BLACK_PAWN;
@@ -943,6 +1015,8 @@ export default class Chess {
 
         /**
          * Get a hash of the current position for caching and repetition detection
+         * @returns {string} Unique hash string representing the current position
+         * @private
          */
         _getPositionHash() {
             // Create a comprehensive hash based on all position-defining elements
@@ -967,7 +1041,7 @@ export default class Chess {
          * Check for threefold repetition of the current position (optimized)
          * @returns {boolean} True if threefold repetition has occurred
          */
-        IsThreefoldRepetition() {
+        isThreefoldRepetition() {
             if (!this.positionHistory || this.positionHistory.length < 4) {
                 return false; // Need at least 4 positions for threefold repetition
             }
@@ -987,6 +1061,12 @@ export default class Chess {
 
         /**
          * Generate pawn moves optimized for performance
+         * @param {number} r Row coordinate of the pawn
+         * @param {number} c Column coordinate of the pawn
+         * @param {string} from Square in algebraic notation
+         * @param {boolean} isWhite True for white pawn, false for black
+         * @param {Array<Chess.Move>} moves Array to add generated moves to
+         * @private
          */
         _generatePawnMoves(r, c, from, isWhite, moves) {
             const direction = isWhite ? -1 : 1;
@@ -1060,6 +1140,12 @@ export default class Chess {
 
         /**
          * Generate rook moves optimized for performance
+         * @param {number} r Row coordinate of the rook
+         * @param {number} c Column coordinate of the rook
+         * @param {string} from Square in algebraic notation
+         * @param {boolean} isWhite True for white rook, false for black
+         * @param {Array<Chess.Move>} moves Array to add generated moves to
+         * @private
          */
         _generateRookMoves(r, c, from, isWhite, moves) {
             const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
@@ -1067,7 +1153,13 @@ export default class Chess {
         }
 
         /**
-         * Generate bishop moves optimized for performance  
+         * Generate bishop moves optimized for performance
+         * @param {number} r Row coordinate of the bishop
+         * @param {number} c Column coordinate of the bishop
+         * @param {string} from Square in algebraic notation
+         * @param {boolean} isWhite True for white bishop, false for black
+         * @param {Array<Chess.Move>} moves Array to add generated moves to
+         * @private
          */
         _generateBishopMoves(r, c, from, isWhite, moves) {
             const directions = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -1076,6 +1168,12 @@ export default class Chess {
 
         /**
          * Generate queen moves optimized for performance
+         * @param {number} r Row coordinate of the queen
+         * @param {number} c Column coordinate of the queen
+         * @param {string} from Square in algebraic notation
+         * @param {boolean} isWhite True for white queen, false for black
+         * @param {Array<Chess.Move>} moves Array to add generated moves to
+         * @private
          */
         _generateQueenMoves(r, c, from, isWhite, moves) {
             const directions = [[0, 1], [0, -1], [1, 0], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]];
@@ -1084,6 +1182,13 @@ export default class Chess {
 
         /**
          * Generate sliding piece moves (rook, bishop, queen)
+         * @param {number} r Row coordinate of the piece
+         * @param {number} c Column coordinate of the piece
+         * @param {string} from Square in algebraic notation
+         * @param {boolean} isWhite True for white piece, false for black
+         * @param {Array<Array<number>>} directions Array of direction vectors [dr, dc]
+         * @param {Array<Chess.Move>} moves Array to add generated moves to
+         * @private
          */
         _generateSlidingMoves(r, c, from, isWhite, directions, moves) {
             const friendlyStart = isWhite ? Chess.Piece.WHITE_PAWN : Chess.Piece.BLACK_PAWN;
@@ -1115,6 +1220,12 @@ export default class Chess {
 
         /**
          * Generate knight moves optimized for performance
+         * @param {number} r Row coordinate of the knight
+         * @param {number} c Column coordinate of the knight
+         * @param {string} from Square in algebraic notation
+         * @param {boolean} isWhite True for white knight, false for black
+         * @param {Array<Chess.Move>} moves Array to add generated moves to
+         * @private
          */
         _generateKnightMoves(r, c, from, isWhite, moves) {
             const knightMoves = [[-2, -1], [-2, 1], [-1, -2], [-1, 2], [1, -2], [1, 2], [2, -1], [2, 1]];
@@ -1136,6 +1247,12 @@ export default class Chess {
 
         /**
          * Generate king moves optimized for performance
+         * @param {number} r Row coordinate of the king
+         * @param {number} c Column coordinate of the king
+         * @param {string} from Square in algebraic notation
+         * @param {boolean} isWhite True for white king, false for black
+         * @param {Array<Chess.Move>} moves Array to add generated moves to
+         * @private
          */
         _generateKingMoves(r, c, from, isWhite, moves) {
             const kingMoves = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
@@ -1157,14 +1274,14 @@ export default class Chess {
             // Castling
             if (isWhite && r === 7 && c === 4) {
                 // White castling
-                if ((this.castlingRights & 1) && !this.IsKingAttacked(true)) { // King-side
+                if ((this.castlingRights & 1) && !this.isKingAttacked(true)) { // King-side
                     if (this.board[7][5] === Chess.Piece.NONE && this.board[7][6] === Chess.Piece.NONE) {
                         if (!this._isSquareAttacked(7, 5, false) && !this._isSquareAttacked(7, 6, false)) {
                             moves.push(new Chess.Move(from, "G1"));
                         }
                     }
                 }
-                if ((this.castlingRights & 2) && !this.IsKingAttacked(true)) { // Queen-side
+                if ((this.castlingRights & 2) && !this.isKingAttacked(true)) { // Queen-side
                     if (this.board[7][3] === Chess.Piece.NONE && this.board[7][2] === Chess.Piece.NONE && this.board[7][1] === Chess.Piece.NONE) {
                         if (!this._isSquareAttacked(7, 3, false) && !this._isSquareAttacked(7, 2, false)) {
                             moves.push(new Chess.Move(from, "C1"));
@@ -1173,14 +1290,14 @@ export default class Chess {
                 }
             } else if (!isWhite && r === 0 && c === 4) {
                 // Black castling
-                if ((this.castlingRights & 4) && !this.IsKingAttacked(false)) { // King-side
+                if ((this.castlingRights & 4) && !this.isKingAttacked(false)) { // King-side
                     if (this.board[0][5] === Chess.Piece.NONE && this.board[0][6] === Chess.Piece.NONE) {
                         if (!this._isSquareAttacked(0, 5, true) && !this._isSquareAttacked(0, 6, true)) {
                             moves.push(new Chess.Move(from, "G8"));
                         }
                     }
                 }
-                if ((this.castlingRights & 8) && !this.IsKingAttacked(false)) { // Queen-side
+                if ((this.castlingRights & 8) && !this.isKingAttacked(false)) { // Queen-side
                     if (this.board[0][3] === Chess.Piece.NONE && this.board[0][2] === Chess.Piece.NONE && this.board[0][1] === Chess.Piece.NONE) {
                         if (!this._isSquareAttacked(0, 3, true) && !this._isSquareAttacked(0, 2, true)) {
                             moves.push(new Chess.Move(from, "C8"));
