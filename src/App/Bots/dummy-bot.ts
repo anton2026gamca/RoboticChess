@@ -13,7 +13,7 @@ export function think(fen: string): Chess.Move | null {
     const board = new Chess.Board(fen);
     const moves = board.getMoves();
 
-    if (moves.length === 0) {
+    if (moves.length === 0) { // Shouldn't happen
         return null; // No legal moves
     } else if (moves.length === 1) {
         return moves[0]; // Only one move available

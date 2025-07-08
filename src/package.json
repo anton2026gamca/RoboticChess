@@ -10,9 +10,11 @@
         "start": "electron ./start.js"
     },
     "dependencies": {
-        "electron": "^36.5.0"
+        "electron": "^36.5.0",
+        "shiki": "^3.7.0"
     },
     "devDependencies": {
+        "@shikijs/monaco": "^3.7.0",
         "typescript": "^5.8.3"
     }
 }

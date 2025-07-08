@@ -8,7 +8,9 @@
     <!-- Stylesheets -->
     <link rel="stylesheet" href="w3.css">
     <link rel="stylesheet" href="main.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    
+    <!-- Scripts -->
+    <script src="https://kit.fontawesome.com/1f9480df5e.js" crossorigin="anonymous"></script>
 </head>
 <body class="app-body">
     <!-- Header -->
@@ -44,7 +46,7 @@
                 <div class="bot-list-header" style="display: flex; align-items: center; justify-content: space-between;">
                     <span>Bots:</span>
                     <button id="new-bot-btn" class="w3-button w3-round w3-small w3-light-green" style="padding: 2px 8px; font-size: 12px; line-height: 1;">
-                        <i class="fa fa-plus"></i> New
+                        <i class="fas fa-plus"></i> New
                     </button>
                 </div>
                 <div id="bot-list-container"></div>
@@ -89,10 +91,10 @@
                         <span class="w3-small w3-text-dark-grey"><b>Move History:</b></span>
                         <div class="move-history-controls">
                             <button id="undo-move-btn" class="w3-button w3-round w3-small w3-light-blue" style="padding: 2px 8px; font-size: 12px; line-height: 1; margin-right: 4px;">
-                                <i class="fa fa-undo"></i>
+                                <i class="fas fa-undo"></i>
                             </button>
                             <button id="redo-move-btn" class="w3-button w3-round w3-small w3-light-blue" style="padding: 2px 8px; font-size: 12px; line-height: 1;">
-                                <i class="fa fa-repeat"></i>
+                                <i class="fas fa-repeat"></i>
                             </button>
                         </div>
                     </div>
@@ -182,6 +184,15 @@
         </div>
     </div>
 
+    <!-- Pyodide Loading Popup -->
+    <div id="pyodide-loading-popup" class="modal-overlay" style="display: none;">
+        <div class="modal-content-wrapper w3-center" style="max-width: var(--overlay-min-width);">
+            <h3>Loading Pyodide...</h3>
+            <p>Please wait while the Pyodide environment and required packages are being loaded.</p>
+            <div class="loader"><div></div><div></div></div>
+        </div>
+    </div>
+
     <!-- Game Finished Overlay -->
     <div id="game-finished-overlay" class="modal-overlay" style="display: none;">
         <div class="modal-content-wrapper w3-center">
@@ -192,6 +203,7 @@
         </div>
     </div>
 
+    <!-- New Bot Language Selection Dialog -->
     <div id="new-bot-language-dialog" class="modal-overlay" style="display: none;">
         <div class="modal-content-wrapper w3-center">
             <h3>Create New Bot</h3>
@@ -201,10 +213,13 @@
                     &times;
                 </button>
                 <button id="select-js-bot" class="w3-button w3-round language-color js" style="margin: 5px;">
-                    <i class="fa fa-code"></i> JavaScript
+                    <i class="fab fa-js"></i> JavaScript
                 </button>
                 <button id="select-ts-bot" class="w3-button w3-round language-color ts" style="margin: 5px;">
-                    <i class="fa fa-code"></i> TypeScript
+                    <i class="fas fa-code"></i> TypeScript
+                </button>
+                <button id="select-py-bot" class="w3-button w3-round language-color py" style="margin: 5px;">
+                    <i class='fab fa-python'></i> Python
                 </button>
             </div>
         </div>
@@ -215,15 +230,16 @@
         <div class="modal-content-wrapper fullscreen-modal code-editor-layout">
             <div class="code-editor-toolbar">
                 <button id="code-editor-cancel" class="w3-button w3-round w3-red editor-toolbar-button">
-                    <i class="fa fa-times"></i><span class="editor-toolbar-button-label"> Cancel</span>
+                    <i class="fas fa-times"></i><span class="editor-toolbar-button-label"> Cancel</span>
                 </button>
                 <input type="text" class="w3-input editor-title-input" id="code-editor-title" placeholder="Bot Name">
                 <select id="code-editor-language" class="w3-select editor-language-select" style="display: none;">
                     <option value="js">JavaScript</option>
                     <option value="ts">TypeScript</option>
+                    <option value="py">Python</option>
                 </select>
                 <button id="code-editor-save" class="w3-button w3-round w3-light-green editor-toolbar-button">
-                    <i class="fa fa-save"></i><span class="editor-toolbar-button-label"> Save</span>
+                    <i class="fas fa-save"></i><span class="editor-toolbar-button-label"> Save</span>
                 </button>
             </div>
             <!-- Monaco Editor -->

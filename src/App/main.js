@@ -45,6 +45,26 @@ export function think(fen: string): Chess.Move | null {
 
 }`;
 
+const DEFAULT_BOT_CODE_PY = `from chess import Chess
+
+def think(fen: str) -> str:
+    """
+    This function is called when it's the bot's turn
+    Args:
+        fen (str): The current board position in FEN format.
+    Returns:
+        The best move for the bot, or None if no move is found.
+    """
+    board = Chess.Board(fen)
+    pass
+`;
+
+const DEFAULT_BOT_CODE = {
+    'js': DEFAULT_BOT_CODE_JS,
+    'ts': DEFAULT_BOT_CODE_TS,
+    'py': DEFAULT_BOT_CODE_PY
+}
+
 // Timing constants for various update intervals (in milliseconds)
 const TIMER_UPDATE_INTERVAL = 100;    // How often to update timer display
 const BOT_POLL_INTERVAL = 50;         // How often to check for bot moves
@@ -93,11 +113,13 @@ class Bot {
      * Compiles TypeScript code to JavaScript if needed
      * @returns {string} The compiled JavaScript code
      */
-    async getCompiledCode() {
+    async getModuleCode(color = 'white') {
         if (this.language === 'ts') {
-            return await compileTypeScript(this.code);
+            return await getTypeScriptModule(this.code);
+        } else if (this.language === 'py') {
+            return await getPythonModule(this.code, color === 'white' ? 0 : 1);
         }
-        return this.code;
+        return await getJavaScriptModule(this.code);
     }
 }
 
@@ -106,7 +128,9 @@ class Bot {
 // ============================================================================
 
 // Core game components
+/** @type {Chess.Board} */
 let board = new Chess.Board();    // The chess board and game state
+/** @type {Array<Bot>} */
 let bots = [];                    // Array of available bots
 
 // Bot instances and communication
@@ -508,7 +532,12 @@ function resetTimers() {
  * @param {boolean} isWhite - Whether this bot plays as white
  */
 async function setupBot(bot, isWhite) {
-    const iframe = document.getElementById(isWhite ? 'white-bot-iframe' : 'black-bot-iframe');
+    const oldIframe = document.getElementById(isWhite ? 'white-bot-iframe' : 'black-bot-iframe');
+    if (oldIframe)
+        oldIframe.remove();
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('sandbox', 'allow-scripts');
+    iframe.style.display = 'none';
     
     // Clean up previous message handler if it exists
     if (iframe.messageHandler) {
@@ -516,47 +545,56 @@ async function setupBot(bot, isWhite) {
         iframe.messageHandler = null;
     }
     
-    // Get compiled code (handles TypeScript compilation if needed)
-    const compiledCode = await bot.getCompiledCode();
-    
-    const moduleCode = `
-        ${compiledCode}
-        window.addEventListener("message", async event => {
-            const { type, value } = event.data;
-            if (type === "think") {
-                try {
-                    const result = await think(value);
-                    parent.postMessage({type: 'move', value: result}, "*");
-                } catch (error) {
-                    console.error("Bot error:", error);
-                    parent.postMessage({type: 'move', value: null}, "*");
-                }
-            }
-        });
-    `;
-    
-    iframe.srcdoc = `<!DOCTYPE html><html><body><script type="module">${moduleCode}<\/script></body></html>`;
-    
-    // Set up message handler specific to this iframe
-    const messageHandler = function(event) {
+    // Get srcdoc code
+    iframe.srcdoc = await bot.getModuleCode(isWhite ? 'white' : 'black');
+
+    document.body.appendChild(iframe);
+
+    // Wait for the bot to signal it's ready
+    let ready = false;
+
+    const messageHandler = (event) => {
         // Only handle messages from this specific iframe
         if (event.source !== iframe.contentWindow) return;
-        
         const { type, value } = event.data;
-        if (type === 'move') {
+        if (type === 'ready') {
+            ready = true;
+        } else if (type === 'move') {
             if (isWhite) whiteBotMove = value;
             else blackBotMove = value;
+        } else if (type === 'log') {
+            console.log(`[${bot.name}]:`, ...value);
+        } else if (type === 'error') {
+            // Remove Pyodide traceback noise from error message
+            let valueToLog = value;
+            if (typeof value === 'string' && bot.language === 'py') {
+                // Remove Pyodide traceback noise, but keep "Traceback (most recent call last):"
+                valueToLog = value.replace(/File "\/lib\/python311\.zip\/_pyodide\/_base\.py", line \d+, in (eval_code_async|run_async)\n\s*await CodeRunner\([\s\S]*?coroutine = eval\(self\.code, globals, locals\)\n\s*\^+\n?/g, '')
+                                    .replace(/^\s+(File "<exec>",)/gm, `File "${bot.name}.py",`);
+            } else if ((bot.language === 'js' || bot.language === 'ts') && value instanceof Error) {
+                valueToLog = value.stack || value.message || String(value);
+                valueToLog = valueToLog.replace(/^\s*at about:srcdoc:\d+:\d+\n?/gm, '');
+                valueToLog = valueToLog.replace(/about:srcdoc:(\d+):(\d+)/g, (match, line, col) => {
+                    return `Line ${parseInt(line, 10) - 7}:${col}`;
+                });
+            }
+            console.error(`[${bot.name}]:`, valueToLog);
         }
     };
-    
+
+    // Set up message handler specific to this iframe
     window.addEventListener('message', messageHandler);
-    
+
     // Store the handler so we can remove it later if needed
     iframe.messageHandler = messageHandler;
 
-    // Wait for iframe to load
+    // Wait until bot is ready
     await new Promise(resolve => {
-        iframe.onload = resolve;
+        const checkReady = () => {
+            if (ready) resolve();
+            else setTimeout(checkReady, 10);
+        };
+        checkReady();
     });
 
     // Store bot references
@@ -677,15 +715,15 @@ async function saveBot() {
 
     const bot = addBot(title, '', code, language);
 
-    // Update active bots if they match
-    if (whiteBotInstance?.name && title === whiteBotInstance.name) {
-        window.white_bot_code = code;
-        await setupBot(bot, true);
-    }
-    if (blackBotInstance?.name && title === blackBotInstance.name) {
-        window.black_bot_code = code;
-        await setupBot(bot, false);
-    }
+    // // Update active bots if they match
+    // if (whiteBotInstance?.name && title === whiteBotInstance.name) {
+    //     window.white_bot_code = code;
+    //     await setupBot(bot, true);
+    // }
+    // if (blackBotInstance?.name && title === blackBotInstance.name) {
+    //     window.black_bot_code = code;
+    //     await setupBot(bot, false);
+    // }
     
     // Dispose Monaco Editor after saving
     if (window.closeEditor) {
@@ -707,8 +745,8 @@ async function refreshBotsList() {
     bots.forEach(bot => {
         const languageIndicator = bot.language != 'js' ? ` [${bot.language.toUpperCase()}]` : '';
         const botLabel = `${bot.isCustom ? '* ' : ''}${bot.name}${languageIndicator}`;
-        whiteBotTypeSelect.innerHTML += `<option value="${bot.name}">${botLabel}</option>`;
-        blackBotTypeSelect.innerHTML += `<option value="${bot.name}">${botLabel}</option>`;
+        whiteBotTypeSelect.innerHTML += `<option value="${bot.name}${languageIndicator}">${botLabel}</option>`;
+        blackBotTypeSelect.innerHTML += `<option value="${bot.name}${languageIndicator}">${botLabel}</option>`;
         
         // Add all bots to the container (both custom and stock)
         const langBadge = `<span class="w3-tag w3-round w3-small bot-list-badge language-color ${bot.language}"><b>${bot.language.toUpperCase()}</b></span>`;
@@ -805,7 +843,11 @@ function openCodeEditor(botName, botCode, readOnly = false, language = 'js') {
     
     if (window.openEditor) {
         // Determine the Monaco editor language
-        const editorLanguage = language === 'ts' ? 'typescript' : 'javascript';
+        let editorLanguage = 'javascript';
+        if (language === 'ts')
+            editorLanguage = 'typescript';
+        else if (language === 'py')
+            editorLanguage = 'python';
         window.openEditor(botCode, readOnly, editorLanguage);
     }
 }
@@ -1263,8 +1305,7 @@ window.saveBot = saveBot;
 window.editBot = editBot;
 window.viewBot = viewBot;
 window.showNewBotDialog = showNewBotDialog;
-window.newBotCode = DEFAULT_BOT_CODE_JS;
-window.board = board;
+window.getBoard = () => { return board; };
 window.syncBoard = syncBoard;
 window.deleteBot = deleteBot;
 
@@ -1292,8 +1333,13 @@ async function initializeApp() {
     // Load bots
     await loadBots();
     refreshBotsList();
-
+    
+    // Initialize code editor
     await initializeMonaco(document.getElementById('code-editor'));
+
+    // Preload Pyodide workers for Python bots
+    preloadPyodideWorker(0);
+    preloadPyodideWorker(1);
 }
 
 /**
@@ -1343,6 +1389,7 @@ function setupEventListeners() {
     const codeEditorCancel = document.getElementById('code-editor-cancel');
     const selectJsBot = document.getElementById('select-js-bot');
     const selectTsBot = document.getElementById('select-ts-bot');
+    const selectPyBot = document.getElementById('select-py-bot');
 
     // Add event listeners
     if (openMenuBtn) openMenuBtn.addEventListener('click', openMenu);
@@ -1372,12 +1419,15 @@ function setupEventListeners() {
     }
     selectJsBot.addEventListener('click', () => {
         closeOverlay('new-bot-language-dialog');
-        openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE_JS, false, 'js');
+        openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE['js'], false, 'js');
     });
-
     selectTsBot.addEventListener('click', () => {
         closeOverlay('new-bot-language-dialog');
-        openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE_TS, false, 'ts');
+        openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE['ts'], false, 'ts');
+    });
+    selectPyBot.addEventListener('click', () => {
+        closeOverlay('new-bot-language-dialog');
+        openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE['py'], false, 'py');
     });
 
     // Focus trap for overlays
@@ -1669,7 +1719,25 @@ async function getUserInput() {
             if (move) {
                 if (move.promotion) {
                     // Handle promotion move - show promotion overlay
-                    move.promotion = await showPromotionOverlay();
+                    const selectedPromotion = await showPromotionOverlay();
+                    // Convert piece name to Chess.Piece constant
+                    if (selectedPromotion) {
+                        if (board.whiteToPlay) {
+                            switch (selectedPromotion) {
+                                case 'queen': move.promotion = Chess.Piece.WHITE_QUEEN; break;
+                                case 'rook': move.promotion = Chess.Piece.WHITE_ROOK; break;
+                                case 'bishop': move.promotion = Chess.Piece.WHITE_BISHOP; break;
+                                case 'knight': move.promotion = Chess.Piece.WHITE_KNIGHT; break;
+                            }
+                        } else {
+                            switch (selectedPromotion) {
+                                case 'queen': move.promotion = Chess.Piece.BLACK_QUEEN; break;
+                                case 'rook': move.promotion = Chess.Piece.BLACK_ROOK; break;
+                                case 'bishop': move.promotion = Chess.Piece.BLACK_BISHOP; break;
+                                case 'knight': move.promotion = Chess.Piece.BLACK_KNIGHT; break;
+                            }
+                        }
+                    }
                     tryResolve(move);
                 } else {
                     tryResolve(move);
@@ -1840,7 +1908,6 @@ async function gameLoop(whiteIsHuman, blackIsHuman) {
 
         // Process move
         if (!move || move.from === move.to) continue;
-        
         const moveResult = makeMove(move);
         
         // Handle illegal move - treat as loss
@@ -1889,8 +1956,51 @@ function displayGameResult(gameResult) {
 }
 
 // ============================================================================
-// TYPESCRIPT COMPILATION
+// SCRIPT COMPILATION
 // ============================================================================
+
+/**
+ * Returns the HTML for an iframe that executes JavaScript bot code
+ * @param {string} code JavaScript code to execute in the iframe
+ * @returns {string} HTML string containing the iframe code
+ */
+async function getJavaScriptModule(code) {
+    return `<!DOCTYPE html>
+<html>
+<body>
+    <script type="module">
+console.log = function(...args) {
+    parent.postMessage({ type: "log", value: args }, "*");
+};
+${code}
+window.addEventListener("message", async event => {
+    const { type, value } = event.data;
+    if (type === "think") {
+        try {
+            const result = await think(value);
+            parent.postMessage({type: 'move', value: result}, "*");
+        } catch (error) {
+            parent.postMessage({type: 'error', value: error}, "*");
+            parent.postMessage({type: 'move', value: null}, "*");
+        }
+    }
+});
+onload = () => {
+    parent.postMessage({type: 'ready'}, "*");
+};
+    </script>
+</body>
+</html>`;
+}
+
+/**
+ * Returns the HTML for an iframe that executes TypeScript bot code
+ * @param {string} code Typescript code to execute in the iframe
+ * @returns {string} HTML string containing the iframe code
+ */
+async function getTypeScriptModule(code) {
+    return getJavaScriptModule(await compileTypeScript(code));
+}
 
 /**
  * Compiles TypeScript code to JavaScript using the TypeScript compiler
@@ -1931,9 +2041,136 @@ async function compileTypeScript(tsCode) {
         
         return result;
     } catch (error) {
-        console.error('TypeScript compilation error:', error);
         throw new Error(`Failed to compile TypeScript: ${error.message}`);
     }
+}
+
+/**
+ * Preloads a Pyodide worker for the specified index.
+ * @param {number} index - The index of the worker to preload.
+ * @returns {void}
+ */
+
+// --- Pyodide Worker Pool and Proxy Communication ---
+window.pyodideWorkers = [null, null];
+window.pyodideReady = [false, false];
+
+async function preloadPyodideWorker(index) {
+    if (window.pyodideWorkers[index]) return;
+    const workerScript = `
+console.log = function(...args) {
+    const msg = args[0];
+    if (typeof msg === "string" && 
+        (   msg.includes("Loaded micropip") ||
+            msg.includes("Loading micropip") ||
+            msg.includes("micropip already loaded from default channel") ||
+            msg.includes("No new packages to load") )
+    ) { return; }
+    self.postMessage({ type: "log", value: args });
+};
+console.log("TEST LOG");
+self.languagePluginUrl = "https://cdn.jsdelivr.net/pyodide/v0.25.1/full/";
+importScripts("https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js");
+let pyodideReadyPromise = loadPyodide().then(pyodide => { self.pyodide = pyodide; });
+self.onmessage = async (event) => {
+    await pyodideReadyPromise;
+    const { type, value, code } = event.data;
+    try {
+        if (type === "init") {
+            await self.pyodide.loadPackage(['micropip']);
+            await self.pyodide.runPythonAsync("import micropip");
+            // Download chess.py if not already present
+            if (!self.chessPyLoaded) {
+                const response = await fetch('https://anton2026gamca.github.io/RoboticChess/src/App/chess.py');
+                const chessPyCode = await response.text();
+                self.pyodide.FS.writeFile('chess.py', chessPyCode);
+                self.chessPyLoaded = true;
+            }
+            if (code) await self.pyodide.runPythonAsync(code);
+            self.postMessage({ type: "ready" });
+        } else if (type === "think") {
+            self.pyodide.globals.set("fen", value);
+            let result = await self.pyodide.runPythonAsync("think(fen)");
+            self.postMessage({ type: "move", value: result });
+        }
+    } catch (err) {
+        self.postMessage({ type: "error", value: err.message || String(err) });
+    }
+};
+`;
+    const blob = new Blob([workerScript], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    const worker = new Worker(url);
+    window.pyodideWorkers[index] = worker;
+    worker.onmessage = (e) => {
+        const { type } = e.data;
+        if (type === "ready") {
+            window.pyodideReady[index] = true;
+        }
+    };
+}
+
+// Listen for iframe requests for pyodide proxy
+window.addEventListener("message", (event) => {
+    if (!event.data || !event.data.pyodideProxy) return;
+    const { botIndex, type, value, code } = event.data;
+    const worker = window.pyodideWorkers[botIndex];
+    if (!worker) return;
+    // Forward message to worker
+    worker.onmessage = (e) => {
+        // Relay result back to the iframe
+        event.source.postMessage({ pyodideProxy: true, ...e.data, botIndex }, "*");
+    };
+    worker.postMessage({ type, value, code });
+});
+
+/**
+ * Returns the HTML for an iframe that proxies Python bot code to the parent Pyodide worker
+ * @param {string} code - The code to execute in the iframe
+ * @param {number} botIndex - 0 for white, 1 for black
+ */
+async function getPythonModule(code, botIndex = 0) {
+    return `<!DOCTYPE html>
+<html>
+<body>
+    <script>
+        // Send init to parent
+        window.parent.postMessage({ pyodideProxy: true, botIndex: ${botIndex}, type: "init", code: \`${code}\` }, "*");
+
+        window.addEventListener("message", (event) => {
+            if (!event.data) return;
+            // Listen for parent relay of Pyodide results
+            if (event.data.pyodideProxy && event.data.botIndex === ${botIndex}) {
+                if (event.data.type === "move") {
+                    // value is a string like "e2e4" or "e7e85"
+                    let moveStr = typeof event.data.value === "string" ? event.data.value : "";
+                    let from = null, to = null, promotion = null;
+                    if (moveStr.length >= 4) {
+                        from = moveStr.substring(0, 2).toUpperCase();
+                        to = moveStr.substring(2, 4).toUpperCase();
+                        if (moveStr.length > 4) {
+                            promotion = parseInt(moveStr.substring(4, 5), 10);
+                            if (isNaN(promotion)) promotion = null;
+                        }
+                    }
+                    parent.postMessage({ type: "move", value: { from, to, promotion } }, "*");
+                } else if (event.data.type === "ready") {
+                    parent.postMessage({ type: "ready" }, "*");
+                } else {
+                    parent.postMessage({ type: event.data.type, value: event.data.value }, "*");
+                }
+            }
+        });
+
+        // Listen for think requests from parent
+        window.addEventListener("message", (event) => {
+            if (event.data && event.data.type === "think") {
+                window.parent.postMessage({ pyodideProxy: true, botIndex: ${botIndex}, type: "think", value: event.data.value }, "*");
+            }
+        });
+    </script>
+</body>
+</html>`;
 }
 
 // ============================================================================
@@ -1946,11 +2183,21 @@ async function startGameBtnPressed() {
     }
 
     closeOverlay('new-game-overlay');
-    
+
+    // Show loading popup if any bot is Python
     const whitePlayerType = document.getElementById('white-player-type').value;
     const blackPlayerType = document.getElementById('black-player-type').value;
+    const whiteBotType = document.getElementById('white-bot-type')?.value;
+    const blackBotType = document.getElementById('black-bot-type')?.value;
+    let showPyodideLoading = false;
+    if ((whitePlayerType === 'bot' && whiteBotType && whiteBotType.endsWith('[PY]')) ||
+        (blackPlayerType === 'bot' && blackBotType && blackBotType.endsWith('[PY]'))) {
+        showPyodideLoadingPopup();
+        showPyodideLoading = true;
+    }
+
     const boardRotated = document.getElementById('board-rotated').value;
-    
+
     // Set up bots if needed
     try {
         if (whitePlayerType === 'bot') {
@@ -1961,15 +2208,16 @@ async function startGameBtnPressed() {
         }
     } catch (error) {
         console.error('Error setting up bots:', error);
+        if (showPyodideLoading) closeOverlay('pyodide-loading-popup');
         return;
     }
-    
+
     // Configure board orientation
     whiteOnBottom = boardRotated === 'white';
-    
+
     // Clean up previous game
     document.querySelectorAll('#bot-indicator').forEach(el => el.remove());
-    
+
     // Initialize new game
     board = new Chess.Board();
     clearMoveHistory();
@@ -1978,7 +2226,9 @@ async function startGameBtnPressed() {
 
     // Wait for any ongoing game to finish
     while (playingGame) await sleep(25);
-    
+
+    // Hide loading popup if shown
+    if (showPyodideLoading) closeOverlay('pyodide-loading-popup');
     // Start new game
     playGame(whitePlayerType === 'human', blackPlayerType === 'human');
 }
@@ -1986,9 +2236,11 @@ async function startGameBtnPressed() {
 async function setupPlayerBot(isWhite) {
     const typeElement = document.getElementById(isWhite ? 'white-bot-type' : 'black-bot-type');
     const inputElement = document.getElementById(isWhite ? 'white-bot-script' : 'black-bot-script');
-    const isCustom = typeElement.value === '*';
+    const isNew = typeElement.value === '*';
+    const name = typeElement.value.replace(/\s*\[.{2}\]$/, '');
+    const language = typeElement.value.match(/\[.{2}\]/)?.[0]?.replace(/\[|\]/g, '').toLowerCase() || 'js';
 
-    if (isCustom) {
+    if (isNew) {
         if (!inputElement.files || inputElement.files.length === 0) {
             throw new Error(`[${isWhite ? 'White' : 'Black'} Bot] Error: No bot file selected`);
         }
@@ -1998,10 +2250,9 @@ async function setupPlayerBot(isWhite) {
         const bot = addBot(file.name, '', code);
         await setupBot(bot, isWhite);
     } else {
-        const bot = bots.find(b => b.name === typeElement.value);
-        if (!bot) {
-            throw new Error(`[${isWhite ? 'White' : 'Black'} Bot] Error: Bot "${typeElement.value}" not found`);
-        }
+        const bot = bots.find(b => b.name === name && b.language === language);
+        if (!bot)
+            throw new Error(`[${isWhite ? 'White' : 'Black'} Bot] Error: Bot "${name}" not found`);
         await setupBot(bot, isWhite);
     }
 }
@@ -2062,4 +2313,13 @@ function showNewBotDialog() {
     setTimeout(() => {
         document.getElementById('select-js-bot').focus();
     }, 0);
+}
+
+function showPyodideLoadingPopup() {
+    let popup = document.getElementById('pyodide-loading-popup');
+    popup.style.display = 'flex';
+    document.body.classList.add('modal-overlay-active');
+    
+    // Store currently focused element
+    window.lastFocusedElement = document.activeElement;
 }

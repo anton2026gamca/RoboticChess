@@ -11,15 +11,15 @@ RoboticChess is an interactive app where you can play chess against AI bots, wat
 
 ### Getting Started
 
-#### Web App
+Web App:
 
 1. Go to [the website](https://anton2026gamca.github.io/RoboticChess/src/App/)
 
-#### Electron
+Electron:
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/yourusername/RoboticChess.git
+    git clone https://github.com/anton2026gamca/RoboticChess.git
     ```
 2. Install dependencies:
     ```bash
@@ -30,10 +30,6 @@ RoboticChess is an interactive app where you can play chess against AI bots, wat
     npm start
     ```
 
-### Contributing
-
-Contributions are welcome! Please open issues or submit pull requests to help improve RoboticChess.
-
 ### License
 
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](https://github.com/anton2026gamca/RoboticChess?tab=MIT-1-ov-file).

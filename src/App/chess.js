@@ -392,7 +392,7 @@ export default class Chess {
             // Validate move legality if requested
             if (check_legal) {
                 const legalMoves = this.getMoves();
-                const isLegal = legalMoves.some(m => m.from === move.from && m.to === move.to);
+                const isLegal = legalMoves.some(m => m.from.toLowerCase() === move.from.toLowerCase() && m.to.toLowerCase() === move.to.toLowerCase());
                 if (!isLegal) {
                     return { 
                         over: true,
@@ -497,13 +497,10 @@ export default class Chess {
 
             // Handle pawn promotion
             let promotion = null;
-            let promotedPiece = null;
             if (fromPiece === Chess.Piece.WHITE_PAWN && move.to[1] === "8") {
-                promotedPiece = move.promotion || Chess.Piece.WHITE_QUEEN;
-                promotion = promotedPiece;
+                promotion = move.promotion || Chess.Piece.WHITE_QUEEN;
             } else if (fromPiece === Chess.Piece.BLACK_PAWN && move.to[1] === "1") {
-                promotedPiece = move.promotion || Chess.Piece.BLACK_QUEEN;
-                promotion = promotedPiece;
+                promotion = move.promotion || Chess.Piece.BLACK_QUEEN;
             }
 
             // Mark special moves that require UI synchronization
@@ -514,7 +511,7 @@ export default class Chess {
             // Execute the actual piece movement (unless it's castling, already handled)
             if (!castlingMove) {
                 if (promotion) {
-                    this.setPiece(promotedPiece, move.to);
+                    this.setPiece(promotion, move.to);
                     this.setPiece(Chess.Piece.NONE, move.from);
                 } else {
                     this.setPiece(fromPiece, move.to);

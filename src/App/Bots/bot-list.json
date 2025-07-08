@@ -8,6 +8,10 @@
         "url": "./Bots/dummy-bot.ts"
     },
     {
+        "name": "Dummy Bot",
+        "url": "./Bots/dummy-bot.py"
+    },
+    {
         "name": "Minimax Bot",
         "url": "./Bots/minimax-bot.js"
     },

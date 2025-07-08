@@ -348,6 +348,120 @@ const MONACO_CONFIG = {
     }
 };
 
+// // Register a basic hover provider for Python
+// function setupPythonHoverProvider() {
+//     if (!window.monaco || !window.monaco.languages) return;
+//     // Remove any previous hover providers (optional, for hot reload)
+//     if (window.__pythonHoverProviderDisposable) {
+//         window.__pythonHoverProviderDisposable.dispose();
+//     }
+//     // Show hover for function names, class names, and variable/property names
+//     window.__pythonHoverProviderDisposable = monaco.languages.registerHoverProvider('python', {
+//         provideHover: function(model, position) {
+//             const lineContent = model.getLineContent(position.lineNumber);
+//             const col = position.column - 1;
+//             // Function definition: def function_name(
+//             const functionRegex = /\bdef\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(/g;
+//             let match;
+//             while ((match = functionRegex.exec(lineContent)) !== null) {
+//                 const fnName = match[1];
+//                 const start = match.index + match[0].indexOf(fnName);
+//                 const end = start + fnName.length;
+//                 if (col >= start && col <= end) {
+//                     return {
+//                         range: new monaco.Range(position.lineNumber, start + 1, position.lineNumber, end + 1),
+//                         contents: [
+//                             { value: `**Function:** \`${fnName}\`` }
+//                         ]
+//                     };
+//                 }
+//             }
+//             // Class definition: class ClassName(
+//             const classRegex = /\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\s*([(:]?)/g;
+//             while ((match = classRegex.exec(lineContent)) !== null) {
+//                 const className = match[1];
+//                 const start = match.index + match[0].indexOf(className);
+//                 const end = start + className.length;
+//                 if (col >= start && col <= end) {
+//                     return {
+//                         range: new monaco.Range(position.lineNumber, start + 1, position.lineNumber, end + 1),
+//                         contents: [
+//                             { value: `**Class:** \`${className}\`` }
+//                         ]
+//                     };
+//                 }
+//             }
+//             // Variable/property/identifier: highlight any word (skip keywords, comments, and strings)
+//             const word = model.getWordAtPosition(position);
+//             if (word) {
+//                 // Exclude Python keywords (basic set)
+//                 const keywords = [
+//                     'def','class','if','elif','else','for','while','break','continue','return','yield','try','except','finally','with','pass','lambda','global','nonlocal','assert','del','import','from','as','print','input','int','float','str','list','dict','set','tuple','bool','None','True','False','and','or','not','is','in'
+//                 ];
+//                 // Check token type at position (avoid comments and strings, including multiline and triple-quoted)
+//                 let inCommentOrString = false;
+//                 if (model.getModeId && model.getModeId() === 'python' && monaco.editor.tokenize) {
+//                     // Track if we are inside a triple-quoted string up to the current line
+//                     let inMultilineString = false;
+//                     let multilineStringDelimiter = null;
+//                     for (let i = 1; i <= position.lineNumber; i++) {
+//                         const line = model.getLineContent(i);
+//                         let lineTokens = monaco.editor.tokenize(line, 'python')[0] || [];
+//                         let offset = 0;
+//                         let lineInString = false;
+//                         for (let t = 0; t < lineTokens.length; t++) {
+//                             const token = lineTokens[t];
+//                             const tokenStart = offset;
+//                             const tokenEnd = offset + (token.length || 0);
+//                             // Detect triple-quoted string start/end
+//                             if (token.type && token.type.indexOf('string') !== -1) {
+//                                 // Check for triple quotes in the token text
+//                                 const tokenText = line.substring(tokenStart, tokenEnd);
+//                                 let tripleQuoteMatch = tokenText.match(/(["']{3})/g);
+//                                 if (tripleQuoteMatch) {
+//                                     for (let match of tripleQuoteMatch) {
+//                                         if (!inMultilineString) {
+//                                             inMultilineString = true;
+//                                             multilineStringDelimiter = match;
+//                                         } else if (inMultilineString && match === multilineStringDelimiter) {
+//                                             inMultilineString = false;
+//                                             multilineStringDelimiter = null;
+//                                         }
+//                                     }
+//                                 }
+//                             }
+//                             // Only check the current line and word for comments/strings
+//                             if (i === position.lineNumber && word.startColumn - 1 >= tokenStart && word.endColumn - 1 <= tokenEnd) {
+//                                 if (token.type && (token.type.indexOf('comment') !== -1 || token.type.indexOf('string') !== -1)) {
+//                                     inCommentOrString = true;
+//                                 }
+//                                 if (inMultilineString) {
+//                                     inCommentOrString = true;
+//                                 }
+//                                 break;
+//                             }
+//                             offset = tokenEnd;
+//                         }
+//                         // If the word is not on this line, but we are in a multiline string, suppress hover
+//                         if (i === position.lineNumber && inMultilineString) {
+//                             inCommentOrString = true;
+//                         }
+//                     }
+//                 }
+//                 if (!keywords.includes(word.word) && !inCommentOrString) {
+//                     return {
+//                         range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
+//                         contents: [
+//                             { value: `**Identifier:** \`${word.word}\`` }
+//                         ]
+//                     };
+//                 }
+//             }
+//             return null;
+//         }
+//     });
+// }
+
 // Load Monaco Editor from CDN and setup advanced features
 function loadMonacoEditor() {
     return new Promise((resolve, reject) => {
@@ -380,7 +494,10 @@ function loadMonacoEditor() {
                 
                 // Setup semantic tokenization
                 setupSemanticTokenization();
-                
+
+                // Setup Python hover provider
+                //setupPythonHoverProvider();
+
                 // Set up global error handler for Monaco
                 window.monaco.editor.onDidCreateModel((model) => {
                     model.onDidChangeContent(() => {
@@ -388,7 +505,7 @@ function loadMonacoEditor() {
                         // Semantic tokens are already handled by the registered provider
                     });
                 });
-                
+
                 resolve();
             }, (error) => {
                 console.error('Failed to load Monaco Editor main module:', error);
@@ -418,49 +535,6 @@ function registerCustomThemes() {
 // Setup enhanced JavaScript language features
 function setupJavaScriptLanguageFeatures() {
     if (!window.monaco) return;
-    
-    const languageConfig = {
-        comments: {
-            lineComment: '//',
-            blockComment: ['/*', '*/']
-        },
-        brackets: [
-            ['{', '}'],
-            ['[', ']'],
-            ['(', ')']
-        ],
-        autoClosingPairs: [
-            { open: '{', close: '}' },
-            { open: '[', close: ']' },
-            { open: '(', close: ')' },
-            { open: '"', close: '"' },
-            { open: "'", close: "'" },
-            { open: '`', close: '`' }
-        ],
-        surroundingPairs: [
-            { open: '{', close: '}' },
-            { open: '[', close: ']' },
-            { open: '(', close: ')' },
-            { open: '"', close: '"' },
-            { open: "'", close: "'" },
-            { open: '`', close: '`' }
-        ],
-        folding: {
-            markers: {
-                start: new RegExp('^\\s*//\\s*#?region\\b'),
-                end: new RegExp('^\\s*//\\s*#?endregion\\b')
-            }
-        },
-        indentationRules: {
-            increaseIndentPattern: /^((?!.*?\/\*).*)*(\{[^}"'`]*|\([^)"'`]*|\[[^\]"'`]*)$/,
-            decreaseIndentPattern: /^((?!.*?\/\*).*)*[\}\]\)]/
-        },
-        wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\#\%\^\&\*\(\)\-\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\?\s]+)/g
-    };
-
-    // Enhanced language configuration
-    monaco.languages.setLanguageConfiguration('javascript', languageConfig);
-    monaco.languages.setLanguageConfiguration('typescript', languageConfig);
 
     // Enhanced tokenization rules
     monaco.languages.setMonarchTokensProvider('javascript', {
@@ -958,47 +1032,64 @@ function tokenizeLine(line, lineIndex) {
     return tokens;
 }
 
+async function loadChessLib(language) {
+    if (language === 'javascript') {
+        // Fetch runtime module
+        fetch('https://anton2026gamca.github.io/RoboticChess/src/App/chess.js')
+            .then(res => res.text())
+            .then(code => {
+                // Wrap it inside a 'declare module' with exports inferred
+                const wrapped = `
+                    declare module 'https://anton2026gamca.github.io/RoboticChess/src/App/chess.js' {
+                        ${code}
+                    }
+                `;
+
+                // Inject into Monaco as virtual declaration
+                monaco.languages.typescript.javascriptDefaults.addExtraLib(
+                    wrapped,
+                    'file:///node_modules/@types/chess-url/index.d.ts'
+                );
+            })
+            .catch(err => console.error('[Monaco] chess.js fetch error:', err));
+    } else if (language === 'typescript') {
+        // Load local chess.d.ts for type definitions, but allow import from the remote URL
+        fetch('./chess.d.ts')
+            .then(res => res.text())
+            .then(dts => {
+                // Register the type definitions for the remote module URL
+                const wrapped = `
+                    ${dts}
+                `;
+                monaco.languages.typescript.typescriptDefaults.addExtraLib(
+                    wrapped,
+                    'file:///node_modules/@types/chess-url/index.d.ts'
+                );
+            })
+            .catch(err => console.error('[Monaco] chess.d.ts fetch error:', err));
+    } else if (language === 'python') {
+        fetch('./chess.py')
+            .then(res => res.text())
+            .then(pyCode => {
+                // Expose the chess.py code as a virtual file for Monaco Python language server (if supported)
+                if (window.monaco && window.monaco.languages && window.monaco.languages.python) {
+                    // This is a placeholder for integration with a Monaco Python language server.
+                    // Actual integration depends on the Monaco Python extension used.
+                    // For now, we can store it globally for possible use by a Python worker.
+                    window.__monaco_python_chess_lib__ = pyCode;
+                }
+            })
+            .catch(err => console.error('[Monaco] chess.py fetch error:', err));
+    }
+}
+
 // Initialize Monaco Editor in a container
 async function initializeMonacoEditor(container, initialValue = '', readOnly = false, language = 'javascript') {
     try {
         // Ensure Monaco is loaded
         await loadMonacoEditor();
 
-        if (language === 'javascript') {
-            // Fetch runtime module
-            fetch('https://anton2026gamca.github.io/RoboticChess/src/App/chess.js')
-                .then(res => res.text())
-                .then(code => {
-                    // Wrap it inside a 'declare module' with exports inferred
-                    const wrapped = `
-                        declare module 'https://anton2026gamca.github.io/RoboticChess/src/App/chess.js' {
-                            ${code}
-                        }
-                    `;
-
-                    // Inject into Monaco as virtual declaration
-                    monaco.languages.typescript.javascriptDefaults.addExtraLib(
-                        wrapped,
-                        'file:///node_modules/@types/chess-url/index.d.ts'
-                    );
-                })
-                .catch(err => console.error('[Monaco] chess.js fetch error:', err));
-        } else if (language === 'typescript') {
-            // Load local chess.d.ts for type definitions, but allow import from the remote URL
-            fetch('./chess.d.ts')
-                .then(res => res.text())
-                .then(dts => {
-                    // Register the type definitions for the remote module URL
-                    const wrapped = `
-                        ${dts}
-                    `;
-                    monaco.languages.typescript.typescriptDefaults.addExtraLib(
-                        wrapped,
-                        'file:///node_modules/@types/chess-url/index.d.ts'
-                    );
-                })
-                .catch(err => console.error('[Monaco] chess.d.ts fetch error:', err));
-        }
+        await loadChessLib(language);
         
         // Dispose existing editor if any
         if (monacoEditor) {
