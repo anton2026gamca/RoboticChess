@@ -66,7 +66,7 @@ const DEFAULT_BOT_CODE = {
 }
 
 // Timing constants for various update intervals (in milliseconds)
-const TIMER_UPDATE_INTERVAL = 100;    // How often to update timer display
+const TIMER_UPDATE_INTERVAL = 50;    // How often to update timer display
 const BOT_POLL_INTERVAL = 50;         // How often to check for bot moves
 const UNDO_CHECK_INTERVAL = 100;      // How often to check for undo requests
 
@@ -144,13 +144,12 @@ let blackBotIframe = null;
 // Game state flags
 let undoRequested = false;
 let quitRequested = false;
+let isTimeout = false;
 let playingGame = false;
 
 // Timer state
 let whiteTime = 0;
 let blackTime = 0;
-let whiteAccumulated = 0;
-let blackAccumulated = 0;
 let whiteTimerInterval = null;
 let blackTimerInterval = null;
 
@@ -406,7 +405,6 @@ function syncBoard() {
         for (let col = 0; col < 8; col++) {
             const square = getSquareFromCoords(row, col);
             const elem = document.getElementById(square);
-            
             if (elem) {
                 const piece = board.board[row][col];
                 const img = getPieceImage(piece);
@@ -414,6 +412,28 @@ function syncBoard() {
             }
         }
     }
+    const fenDisplay = document.getElementById('current-fen');
+    fenDisplay.textContent = board.getFEN();
+}
+
+/**
+ * Highlights the from and to squares of a move with different styles for light and dark squares
+ */
+function highlightMove(move) {
+    document.querySelectorAll('.chess-game-square.move-from, .chess-game-square.move-to').forEach(el => {
+        el.classList.remove('move-from', 'move-to');
+    });
+    if (!move || !move.from || !move.to) return;
+    [move.from, move.to].forEach((square, idx) => {
+        const elem = document.getElementById(square);
+        if (elem) {
+            if (idx === 0) {
+                elem.classList.add('move-from');
+            } else {
+                elem.classList.add('move-to');
+            }
+        }
+    });
 }
 
 /**
@@ -448,17 +468,40 @@ function clearSquare(square) {
 function updateTimersDisplay() {
     const whiteTimerElem = document.getElementById(whiteOnBottom ? 'player-bottom-timer' : 'player-top-timer');
     const blackTimerElem = document.getElementById(whiteOnBottom ? 'player-top-timer' : 'player-bottom-timer');
-    
-    if (whiteTimerElem) whiteTimerElem.textContent = `${(whiteTime / 1000).toFixed(1)}s`;
-    if (blackTimerElem) blackTimerElem.textContent = `${(blackTime / 1000).toFixed(1)}s`;
+    const cfg = window.chessTimerConfig || {};
+    const whiteTimerEnabled = cfg.whiteTimerEnabled !== false; // default true
+    const blackTimerEnabled = cfg.blackTimerEnabled !== false; // default true
+    function formatTime(ms, countDown) {
+        ms = Math.max(0, ms);
+        const totalSeconds = Math.floor(ms / 1000);
+        const min = Math.floor(totalSeconds / 60);
+        const sec = totalSeconds % 60;
+        return (countDown ? '' : '∞ ') + `${min}:${sec.toString().padStart(2, '0')}`;
+    }
+    if (whiteTimerElem) {
+        if (whiteTimerEnabled) {
+            whiteTimerElem.textContent = formatTime(whiteTime, true);
+        } else {
+            whiteTimerElem.textContent = formatTime(whiteTime, false);
+        }
+    }
+    if (blackTimerElem) {
+        if (blackTimerEnabled) {
+            blackTimerElem.textContent = formatTime(blackTime, true);
+        } else {
+            blackTimerElem.textContent = formatTime(blackTime, false);
+        }
+    }
 }
 
 /**
  * Starts a timer for the specified player and ensures proper visual indicators
  * @param {boolean} isWhite - Whether to start the white player's timer
- * @param {number} startTime - The timestamp when the timer started
  */
-function startTimer(isWhite, startTime) {
+function startTimer(isWhite) {
+    const cfg = window.chessTimerConfig || {};
+    const whiteTimerEnabled = cfg.whiteTimerEnabled !== false;
+    const blackTimerEnabled = cfg.blackTimerEnabled !== false;
     const timerElem = document.getElementById(
         isWhite ? (whiteOnBottom ? 'player-bottom-timer' : 'player-top-timer') 
                 : (whiteOnBottom ? 'player-top-timer' : 'player-bottom-timer')
@@ -467,28 +510,49 @@ function startTimer(isWhite, startTime) {
         isWhite ? (whiteOnBottom ? 'player-top-timer' : 'player-bottom-timer') 
                 : (whiteOnBottom ? 'player-bottom-timer' : 'player-top-timer')
     );
-
-    // Clear existing intervals
     if (whiteTimerInterval) { clearInterval(whiteTimerInterval); whiteTimerInterval = null; }
     if (blackTimerInterval) { clearInterval(blackTimerInterval); blackTimerInterval = null; }
-
-    // Start new timer
     const timerInterval = setInterval(() => {
         if (isWhite) {
-            whiteTime = Date.now() - startTime + whiteAccumulated;
+            if (whiteTimerEnabled) {
+                whiteTime -= TIMER_UPDATE_INTERVAL;
+                if (whiteTime <= 0) {
+                    whiteTime = 0;
+                    updateTimersDisplay();
+                    clearInterval(timerInterval);
+                    if (whiteTimerInterval) { clearInterval(whiteTimerInterval); whiteTimerInterval = null; }
+                    if (blackTimerInterval) { clearInterval(blackTimerInterval); blackTimerInterval = null; }
+                    isTimeout = true;
+                    console.log("White's time is up!");
+                    return;
+                }
+            } else {
+                whiteTime += TIMER_UPDATE_INTERVAL;
+            }
         } else {
-            blackTime = Date.now() - startTime + blackAccumulated;
+            if (blackTimerEnabled) {
+                blackTime -= TIMER_UPDATE_INTERVAL;
+                if (blackTime <= 0) {
+                    blackTime = 0;
+                    updateTimersDisplay();
+                    clearInterval(timerInterval);
+                    if (whiteTimerInterval) { clearInterval(whiteTimerInterval); whiteTimerInterval = null; }
+                    if (blackTimerInterval) { clearInterval(blackTimerInterval); blackTimerInterval = null; }
+                    isTimeout = true;
+                    console.log("Black's time is up!");
+                    return;
+                }
+            } else {
+                blackTime += TIMER_UPDATE_INTERVAL;
+            }
         }
         updateTimersDisplay();
     }, TIMER_UPDATE_INTERVAL);
-
     if (isWhite) {
         whiteTimerInterval = timerInterval;
     } else {
         blackTimerInterval = timerInterval;
     }
-
-    // Update visual indicators
     timerElem.classList.add('timer-active');
     otherTimerElem.classList.remove('timer-active');
 }
@@ -514,10 +578,14 @@ function stopTimers() {
  * Resets all timer values to zero and stops any running timers
  */
 function resetTimers() {
-    whiteTime = 0;
-    blackTime = 0;
-    whiteAccumulated = 0;
-    blackAccumulated = 0;
+    // Set timers to configured value (in ms)
+    const cfg = window.chessTimerConfig || {};
+    const whiteMinutes = cfg.whiteMinutes || 10;
+    const blackMinutes = cfg.blackMinutes || 10;
+    const whiteTimerEnabled = cfg.whiteTimerEnabled !== false; // default true
+    const blackTimerEnabled = cfg.blackTimerEnabled !== false; // default true
+    whiteTime = whiteTimerEnabled ? whiteMinutes * 60 * 1000 : 0;
+    blackTime = blackTimerEnabled ? blackMinutes * 60 * 1000 : 0;
     stopTimers();
     updateTimersDisplay();
 }
@@ -999,40 +1067,39 @@ function addMoveToHistory(move, notation, isWhite) {
     updateUndoRedoButtons();
 }
 
-function updateMovesDisplay() {
+function updateMovesDisplay(changeScroll = true) {
     const movesContainer = document.getElementById('moves-list');
     if (!movesContainer) return;
-    
+
     if (moveHistory.length === 0) {
         movesContainer.innerHTML = '<div class="w3-text-grey w3-small">No moves yet</div>';
         return;
     }
-    
+
     let html = '';
     for (let i = 0; i < moveHistory.length; i += 2) {
         const moveNumber = Math.floor(i / 2) + 1;
         const whiteMove = moveHistory[i];
         const blackMove = moveHistory[i + 1];
-        
+
         html += `<div class="move-pair">
             <span class="move-number">${moveNumber}.</span>
             <div class="move-notation">
                 <span class="white-move ${currentMoveIndex === i ? 'move-current' : ''}" 
                       data-move-index="${i}">${whiteMove.notation}</span>`;
-        
+
         if (blackMove) {
             html += `<span class="black-move ${currentMoveIndex === i + 1 ? 'move-current' : ''}" 
                           data-move-index="${i + 1}">${blackMove.notation}</span>`;
         } else {
-            // Add empty placeholder for black move to maintain consistent layout
             html += `<span class="black-move-placeholder"></span>`;
         }
-        
+
         html += '</div></div>';
     }
-    
+
     movesContainer.innerHTML = html;
-    
+
     // Add click handlers for move navigation
     movesContainer.querySelectorAll('.white-move, .black-move').forEach(moveElement => {
         moveElement.addEventListener('click', (e) => {
@@ -1040,11 +1107,21 @@ function updateMovesDisplay() {
             navigateToMove(moveIndex);
         });
     });
-    
-    // Auto-scroll to bottom
+
+    // Improved scroll logic
     const scrollContainer = document.getElementById('moves-list-container');
-    if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    const currentMoveElem = movesContainer.querySelector('.move-current');
+    if (currentMoveElem) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const elemRect = currentMoveElem.getBoundingClientRect();
+        // Check if current move is outside the visible area
+        if (elemRect.top < containerRect.top) {
+            // Scroll so that the current move is just at the top
+            scrollContainer.scrollTop += elemRect.top - containerRect.top;
+        } else if (elemRect.bottom > containerRect.bottom) {
+            // Scroll so that the current move is just at the bottom
+            scrollContainer.scrollTop += elemRect.bottom - containerRect.bottom;
+        }
     }
 }
 
@@ -1067,6 +1144,12 @@ function navigateToMove(moveIndex) {
     }
     
     syncBoard();
+    // Highlight the last move if any
+    if (moveIndex >= 0 && moveHistory[moveIndex]) {
+        highlightMove(moveHistory[moveIndex].move);
+    } else {
+        highlightMove(null);
+    }
     updateMovesDisplay();
     updateGameStatus();
     updateUndoRedoButtons();
@@ -1075,8 +1158,7 @@ function navigateToMove(moveIndex) {
     if (playingGame) {
         const gameOverState = board.isGameOver();
         if (!gameOverState.over) {
-            const startTime = Date.now();
-            startTimer(board.whiteToPlay, startTime);
+            startTimer(board.whiteToPlay);
         }
     }
 }
@@ -1148,13 +1230,13 @@ function redoMove() {
             updateMovesDisplay();
             updateGameStatus();
             updateUndoRedoButtons();
+            highlightMove(nextMove.move);
             
             // Always ensure the correct timer is running during an active game
             if (playingGame) {
                 const gameOverState = board.isGameOver();
                 if (!gameOverState.over) {
-                    const startTime = Date.now();
-                    startTimer(board.whiteToPlay, startTime);
+                    startTimer(board.whiteToPlay);
                 }
             }
         }
@@ -1205,7 +1287,11 @@ function makeMove(move) {
     // Special moves may require full board sync
     if (result.requireSync) {
         syncBoard();
+    } else {
+        const fenDisplay = document.getElementById('current-fen');
+        fenDisplay.textContent = board.getFEN();
     }
+    highlightMove(move);
 
     // Return the result (could be game over or success)
     return result;
@@ -1342,6 +1428,20 @@ async function initializeApp() {
     preloadPyodideWorker(1);
 }
 
+// Timer input enable/disable logic
+function updateTimerInputs() {
+    const whiteCheckbox = document.getElementById('white-timer-enabled');
+    const whiteInput = document.getElementById('white-timer-minutes');
+    const blackCheckbox = document.getElementById('black-timer-enabled');
+    const blackInput = document.getElementById('black-timer-minutes');
+    if (whiteCheckbox && whiteInput) {
+        whiteInput.disabled = !whiteCheckbox.checked;
+    }
+    if (blackCheckbox && blackInput) {
+        blackInput.disabled = !blackCheckbox.checked;
+    }
+}
+
 /**
  * Loads saved settings from localStorage and applies them to the UI
  */
@@ -1365,6 +1465,21 @@ function loadSettings() {
 
     document.getElementById('white-bot-script').style.display = whiteType === 'bot' ? 'block' : 'none';
     document.getElementById('black-bot-script').style.display = blackType === 'bot' ? 'block' : 'none';
+
+    // Restore timer settings
+    const whiteTimerInput = document.getElementById('white-timer-minutes');
+    const blackTimerInput = document.getElementById('black-timer-minutes');
+    const whiteTimerEnabledCheckbox = document.getElementById('white-timer-enabled');
+    const blackTimerEnabledCheckbox = document.getElementById('black-timer-enabled');
+    const whiteMinutes = localStorage.getItem('white-timer-minutes');
+    const blackMinutes = localStorage.getItem('black-timer-minutes');
+    const whiteTimerEnabled = localStorage.getItem('white-timer-enabled');
+    const blackTimerEnabled = localStorage.getItem('black-timer-enabled');
+    if (whiteTimerInput && whiteMinutes !== null) whiteTimerInput.value = whiteMinutes;
+    if (blackTimerInput && blackMinutes !== null) blackTimerInput.value = blackMinutes;
+    if (whiteTimerEnabledCheckbox && whiteTimerEnabled !== null) whiteTimerEnabledCheckbox.checked = whiteTimerEnabled === '1';
+    if (blackTimerEnabledCheckbox && blackTimerEnabled !== null) blackTimerEnabledCheckbox.checked = blackTimerEnabled === '1';
+    updateTimerInputs();
 }
 
 // Start the application when DOM is loaded
@@ -1390,7 +1505,12 @@ function setupEventListeners() {
     const selectJsBot = document.getElementById('select-js-bot');
     const selectTsBot = document.getElementById('select-ts-bot');
     const selectPyBot = document.getElementById('select-py-bot');
-
+    const copyBtn = document.getElementById('copy-fen-btn');
+    const fenText = document.getElementById('current-fen');
+    const copiedText = document.getElementById('fen-copied-text');
+    const whiteCheckbox = document.getElementById('white-timer-enabled');
+    const blackCheckbox = document.getElementById('black-timer-enabled');
+    
     // Add event listeners
     if (openMenuBtn) openMenuBtn.addEventListener('click', openMenu);
     if (closeMenuBtn) closeMenuBtn.addEventListener('click', closeMenu);
@@ -1399,6 +1519,8 @@ function setupEventListeners() {
     if (redoBtn) redoBtn.addEventListener('click', redoMoveBtnPressed);
     if (newBotBtn) newBotBtn.addEventListener('click', showNewBotDialog);
     if (startGameBtn) startGameBtn.addEventListener('click', startGameBtnPressed);
+    if (whiteCheckbox) whiteCheckbox.addEventListener('change', updateTimerInputs);
+    if (blackCheckbox) blackCheckbox.addEventListener('change', updateTimerInputs);
     if (codeEditorSave) codeEditorSave.addEventListener('click', saveBot);
     if (codeEditorCancel) {
         codeEditorCancel.addEventListener('click', () => {
@@ -1428,6 +1550,14 @@ function setupEventListeners() {
     selectPyBot.addEventListener('click', () => {
         closeOverlay('new-bot-language-dialog');
         openCodeEditor('New Custom Bot', DEFAULT_BOT_CODE['py'], false, 'py');
+    });
+    copyBtn.addEventListener('click', function() {
+        const fen = fenText.textContent.trim();
+        if (fen) {
+            navigator.clipboard.writeText(fen);
+            copiedText.style.display = 'inline-block';
+            setTimeout(() => copiedText.style.display = 'none', 500);
+        }
     });
 
     // Focus trap for overlays
@@ -1754,7 +1884,7 @@ async function getUserInput() {
 
         // Check for undo/quit requests
         const undoCheck = setInterval(() => {
-            if (undoRequested || quitRequested) {
+            if (undoRequested || quitRequested || isTimeout) {
                 tryResolve(null);
                 clearInterval(undoCheck);
             }
@@ -1800,7 +1930,7 @@ async function getBotInput() {
 
         // Check for interruptions
         const undoCheck = setInterval(() => {
-            if ((undoRequested || quitRequested) && !finished) {
+            if ((undoRequested || quitRequested || isTimeout) && !finished) {
                 finished = true;
                 clearInterval(moveCheck);
                 clearInterval(undoCheck);
@@ -1841,6 +1971,7 @@ async function playGame(whiteIsHuman, blackIsHuman) {
     
     playingGame = false;
     quitRequested = false;
+    isTimeout = false;
     updateUndoRedoButtons();
 }
 
@@ -1878,8 +2009,7 @@ async function gameLoop(whiteIsHuman, blackIsHuman) {
             return { over: true, reason: "game interrupted", winner: "draw" };
         }
 
-        const startTime = Date.now();
-        startTimer(board.whiteToPlay, startTime);
+        startTimer(board.whiteToPlay);
 
         undoRequested = false;
         const move = board.whiteToPlay ? 
@@ -1889,22 +2019,14 @@ async function gameLoop(whiteIsHuman, blackIsHuman) {
         if (quitRequested) {
             return { over: true, reason: "game interrupted", winner: "draw" };
         }
+        if (isTimeout) {
+            return { over: true, reason: "timeout", winner: board.whiteToPlay ? 'black' : 'white' };
+        }
 
         if (undoRequested) {
             // Don't stop timers, just continue the loop
             continue;
         }
-
-        // Update timer accumulation
-        const elapsed = Date.now() - startTime;
-        if (board.whiteToPlay) {
-            whiteAccumulated += elapsed;
-            whiteTime = whiteAccumulated;
-        } else {
-            blackAccumulated += elapsed;
-            blackTime = blackAccumulated;
-        }
-        // Don't stop timers here - the next iteration will start the correct timer
 
         // Process move
         if (!move || move.from === move.to) continue;
@@ -2217,11 +2339,49 @@ async function startGameBtnPressed() {
 
     // Clean up previous game
     document.querySelectorAll('#bot-indicator').forEach(el => el.remove());
+    
+    // Get FEN string from input
+    const fenInput = document.getElementById('fen-string-input');
+    const fenString = fenInput ? fenInput.value.trim() : '';
+    fenInput.value = '';
+
+    // Get timer settings (minutes per player)
+    const whiteTimerInput = document.getElementById('white-timer-minutes');
+    const blackTimerInput = document.getElementById('black-timer-minutes');
+    const whiteTimerEnabledCheckbox = document.getElementById('white-timer-enabled');
+    const blackTimerEnabledCheckbox = document.getElementById('black-timer-enabled');
+    const whiteTimerEnabled = whiteTimerEnabledCheckbox?.checked;
+    const blackTimerEnabled = blackTimerEnabledCheckbox?.checked;
+    let whiteMinutes = 10;
+    let blackMinutes = 10;
+    if (whiteTimerInput && whiteTimerInput.value) {
+        whiteMinutes = Math.max(1, Math.min(180, parseInt(whiteTimerInput.value, 10)));
+    }
+    if (blackTimerInput && blackTimerInput.value) {
+        blackMinutes = Math.max(1, Math.min(180, parseInt(blackTimerInput.value, 10)));
+    }
+    window.chessTimerConfig = { whiteMinutes, blackMinutes, whiteTimerEnabled, blackTimerEnabled };
+
+    // Save timer settings to localStorage
+    localStorage.setItem('white-timer-minutes', whiteMinutes);
+    localStorage.setItem('black-timer-minutes', blackMinutes);
+    localStorage.setItem('white-timer-enabled', whiteTimerEnabled ? '1' : '0');
+    localStorage.setItem('black-timer-enabled', blackTimerEnabled ? '1' : '0');
 
     // Initialize new game
     board = new Chess.Board();
     clearMoveHistory();
     createBoard(whiteOnBottom);
+    // If FEN provided, try to load it
+    let fenLoaded = false;
+    if (fenString) {
+        try {
+            board.loadFEN(fenString);
+            fenLoaded = true;
+        } catch (e) {
+            alert('Invalid FEN string. Starting with default position.');
+        }
+    }
     syncBoard();
 
     // Wait for any ongoing game to finish

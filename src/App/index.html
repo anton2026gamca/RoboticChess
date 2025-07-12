@@ -94,7 +94,7 @@
                                 <i class="fas fa-undo"></i>
                             </button>
                             <button id="redo-move-btn" class="w3-button w3-round w3-small w3-light-blue" style="padding: 2px 8px; font-size: 12px; line-height: 1;">
-                                <i class="fas fa-repeat"></i>
+                                <i class="fas fa-redo"></i>
                             </button>
                         </div>
                     </div>
@@ -102,6 +102,21 @@
                         <div id="moves-list" class="moves-list-content">
                             <div class="w3-text-grey w3-small">No moves yet</div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- FEN String Display -->
+                <div class="w3-padding-small w3-white w3-round" style="margin-top: var(--spacing-sm); min-height: 49px;">
+                    <div class="w3-small w3-text-dark-grey"><b>Current FEN String:</b></div>
+                    <div style="position: relative;">
+                        <div id="current-fen" class="w3-text-black" style="overflow-y: auto; text-wrap: nowrap; padding-right: 30px;"></div>
+                        <button id="copy-fen-btn" class="w3-button w3-round w3-small w3-light-blue" title="Copy FEN"
+                            style="position: absolute; top: 0px; right: 0px; padding: 2px 8px; z-index: 1;">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        <span id="fen-copied-text" class="w3-small" style="display:none; position:absolute; top:0px; right:28px; background: #fff; border-radius: 6px; padding: 2px 8px; z-index:2;">
+                            Copied!
+                        </span>
                     </div>
                 </div>
             </div>
@@ -134,7 +149,7 @@
                     </div>
                     <div id="white-bot-config" class="bot-configuration-panel">
                         <select id="white-bot-type" class="bot-selection-dropdown"></select>
-                        <input type="file" id="white-bot-script" class="bot-file-input" accept=".js">
+                        <input type="file" id="white-bot-script" class="bot-file-input" accept=".js" style="display: none;">
                     </div>
                 </div>
 
@@ -155,7 +170,7 @@
                     </div>
                     <div id="black-bot-config" class="bot-configuration-panel">
                         <select id="black-bot-type" class="bot-selection-dropdown"></select>
-                        <input type="file" id="black-bot-script" class="bot-file-input" accept=".js">
+                        <input type="file" id="black-bot-script" class="bot-file-input" accept=".js" style="display: none;">
                     </div>
                 </div>
 
@@ -173,6 +188,29 @@
                         <button type="button" class="w3-button selection-toggle-button" data-target="board-rotated" data-value="black">
                             Black
                         </button>
+                    </div>
+                </div>
+
+                <!-- FEN String Input -->
+                <div class="player-config-section">
+                    <label class="config-section-label" for="fen-string-input">FEN String (optional):</label>
+                    <input type="text" id="fen-string-input" class="w3-input" style="padding-top: 0; padding-bottom: 0;" placeholder="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1">
+                </div>
+
+                <!-- Timer Configuration -->
+                <div class="player-config-section">
+                    <label class="config-section-label">Time Limit (minutes):</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span style="width: 50%; display: flex; align-items: center;">
+                            <span class="w3-small" style="min-width: 32px; text-align: center;">White</span>
+                            <input type="checkbox" id="white-timer-enabled" style="margin-left: 8px;">
+                            <input type="number" id="white-timer-minutes" class="w3-input w3-small" min="1" max="180" value="10" step="1" style="flex: 1 1 0; padding: 2px 6px; font-size: 0.9em; margin-left: 8px;">
+                        </span>
+                        <span style="width: 50%; display: flex; align-items: center;">
+                            <input type="number" id="black-timer-minutes" class="w3-input w3-small" min="1" max="180" value="10" step="1" style="flex: 1 1 0; padding: 2px 6px; font-size: 0.9em; margin-right: 8px;">
+                            <input type="checkbox" id="black-timer-enabled" style="margin-right: 8px;">
+                            <span class="w3-small" style="min-width: 32px; text-align: center;">Black</span>
+                        </span>
                     </div>
                 </div>
 

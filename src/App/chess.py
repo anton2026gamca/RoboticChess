@@ -136,7 +136,57 @@ class Chess:
             self._king_positions = {'white': None, 'black': None}
             self.position_history = []
             self.move_history = []
+            self.white_time: int | None = None
+            self.black_time: int | None = None
+            self.timers_enabled = False
+            self.timeout_result = None  # { winner, reason } if timeout occurs
             self.load_fen(fen or Chess.Board.DefaultFEN)
+
+        def set_timers(self, white_ms: int = None, black_ms: int = None):
+            """
+            Set timers for both players (in milliseconds).
+            Args:
+                white_ms (int|None): Time for white in ms, or None for no timer.
+                black_ms (int|None): Time for black in ms, or None for no timer.
+            """
+            self.white_time = white_ms
+            self.black_time = black_ms
+            self.timers_enabled = (white_ms is not None or black_ms is not None)
+            self.timeout_result = None
+
+        def decrement_current_player_timer(self, ms: int) -> bool:
+            """
+            Decrement the current player's timer by ms. Returns True if timeout occurred.
+            Args:
+                ms (int): Milliseconds to decrement.
+            Returns:
+                bool: True if timeout occurred.
+            """
+            if not self.timers_enabled:
+                return False
+            if self.white_to_play and self.white_time is not None:
+                self.white_time -= ms
+                if self.white_time <= 0:
+                    self.white_time = 0
+                    self.timeout_result = { 'winner': 'black', 'reason': 'timeout' }
+                    return True
+            elif not self.white_to_play and self.black_time is not None:
+                self.black_time -= ms
+                if self.black_time <= 0:
+                    self.black_time = 0
+                    self.timeout_result = { 'winner': 'white', 'reason': 'timeout' }
+                    return True
+            return False
+
+        def get_player_time(self, is_white: bool) -> int:
+            """
+            Get the remaining time for a player (ms).
+            Args:
+                is_white (bool): True for white, False for black.
+            Returns:
+                int|None: Remaining time in ms, or None if no timer.
+            """
+            return self.white_time if is_white else self.black_time
 
         def load_fen(self, fen: str):
             """
@@ -456,6 +506,8 @@ class Chess:
                     - reason (str|None): Reason for game over
                     - winner (str|None): Winner: "white", "black", or "draw"
             """
+            if self.timers_enabled and self.timeout_result:
+                return { 'over': True, 'reason': self.timeout_result['reason'], 'winner': self.timeout_result['winner'] }
             if self.halfmove >= 100:
                 return {'over': True, 'reason': '50-move rule', 'winner': 'draw'}
             if self.is_insufficient_material():

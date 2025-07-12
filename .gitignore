@@ -1,3 +1,5 @@
+.vscode
 src/node_modules/
 src/.wakatime-project
-src/.vscode
+src/forge.config.js
+src/out

@@ -11,7 +11,8 @@ function createWindow() {
         nodeIntegration: true,
         contextIsolation: false,
         width: 1280,
-        height: 720
+        height: 720,
+        icon: path.join(__dirname, 'icon.ico'),
     });
     window.loadFile('App/index.html');
     window.setMenuBarVisibility(false);

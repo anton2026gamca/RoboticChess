@@ -21,11 +21,15 @@
     --color-square-dark: #b58863;
     --color-square-selected-light: #d32f2f;
     --color-square-selected-dark: #b71c1c;
-    
+    --color-square-light-move-from: #ffd700;
+    --color-square-light-move-to: #ffd700;
+    --color-square-dark-move-from: #da9c00;
+    --color-square-dark-move-to: #da9c00;
+
     /* Timer Colors */
     --color-timer-bg: #444;
     --color-timer-active-bg: whitesmoke;
-    --color-timer-active-text: black;
+    --color-timer-active-text: #000;
     
     /* Interactive Colors */
     --color-focus-outline: #007acc;
@@ -33,8 +37,8 @@
     --color-button-selected-text: #000;
     
     /* Overlay Colors */
-    --color-overlay-bg: rgba(30, 30, 30, 0.5);
-    --color-shadow: rgba(0, 0, 0, 0.4);
+    --color-overlay-bg: #1e1e1e80;
+    --color-shadow: #00000066;
     
     /* Spacing */
     --spacing-xs: 2px;
@@ -171,22 +175,18 @@
 }
 
 /* Square colors */
-.square-light {
-    background: var(--color-square-light);
-}
+.square-light { background: var(--color-square-light); }
+.square-dark { background: var(--color-square-dark); }
 
-.square-dark {
-    background: var(--color-square-dark);
-}
+/* Move highlighting */
+.square-light.move-from { background: var(--color-square-light-move-from); }
+.square-light.move-to   { background: var(--color-square-light-move-to); }
+.square-dark.move-from  { background: var(--color-square-dark-move-from); }
+.square-dark.move-to    { background: var(--color-square-dark-move-to); }
 
 /* Selected square highlighting */
-.square-light.square-selected {
-    background: var(--color-square-selected-light);
-}
-
-.square-dark.square-selected {
-    background: var(--color-square-selected-dark);
-}
+.square-light.square-selected { background: var(--color-square-selected-light) !important; }
+.square-dark.square-selected { background: var(--color-square-selected-dark) !important; }
 
 /* Chess pieces */
 .chess-game-piece {

@@ -175,8 +175,59 @@ export default class Chess {
             this._kingPositions = { white: null, black: null };
             
             this.loadFEN(fen);
+            // Timer state (milliseconds)
+            this.whiteTime = null;
+            this.blackTime = null;
+            this.timersEnabled = false;
+            this.timeoutResult = null; // { winner, reason } if timeout occurs
         }
-    
+
+        /**
+         * Set timers for both players (in milliseconds)
+         * @param {number|null} whiteMs Time for white in ms, or null for no timer
+         * @param {number|null} blackMs Time for black in ms, or null for no timer
+         */
+        setTimers(whiteMs, blackMs) {
+            this.whiteTime = whiteMs;
+            this.blackTime = blackMs;
+            this.timersEnabled = (whiteMs !== null || blackMs !== null);
+            this.timeoutResult = null;
+        }
+
+        /**
+         * Decrement the current player's timer by ms. Returns true if timeout occurred.
+         * @param {number} ms Milliseconds to decrement
+         * @returns {boolean} True if timeout occurred
+         */
+        decrementCurrentPlayerTimer(ms) {
+            if (!this.timersEnabled) return false;
+            if (this.whiteToPlay && this.whiteTime !== null) {
+                this.whiteTime -= ms;
+                if (this.whiteTime <= 0) {
+                    this.whiteTime = 0;
+                    this.timeoutResult = { winner: 'black', reason: 'timeout' };
+                    return true;
+                }
+            } else if (!this.whiteToPlay && this.blackTime !== null) {
+                this.blackTime -= ms;
+                if (this.blackTime <= 0) {
+                    this.blackTime = 0;
+                    this.timeoutResult = { winner: 'white', reason: 'timeout' };
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Get the remaining time for a player (ms)
+         * @param {boolean} isWhite True for white, false for black
+         * @returns {number|null} Remaining time in ms, or null if no timer
+         */
+        getPlayerTime(isWhite) {
+            return isWhite ? this.whiteTime : this.blackTime;
+        }
+
         /**
          * Load a chess position from FEN (Forsyth-Edwards Notation)
          * FEN format: pieces activeColor castling enPassant halfmove fullmove
@@ -752,6 +803,10 @@ export default class Chess {
          *   - {string|null} winner - Winner: "white", "black", or "draw"
          */
         isGameOver() {
+            // Timer timeout check
+            if (this.timeoutResult) {
+                return { over: true, reason: this.timeoutResult.reason, winner: this.timeoutResult.winner };
+            }
             // Check 50-move rule (100 half-moves without pawn move or capture)
             if (this.halfmove >= 100) {
                 return { over: true, reason: "50-move rule", winner: "draw" };
